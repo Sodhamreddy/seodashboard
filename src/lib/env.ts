@@ -67,13 +67,29 @@ export function authSecret() {
 /** Whether this deployment is safe to expose. Used by the login screen. */
 export function authReadiness() {
   const { configured } = authCredentials();
+  const rawUser = process.env.DASHBOARD_USERNAME?.trim() ?? '';
+  const rawPass = process.env.DASHBOARD_PASSWORD?.trim() ?? '';
   const secret = process.env.AUTH_SECRET?.trim() ?? '';
   const secretOk = !IS_PRODUCTION || (secret.length >= 32 && secret !== DEV_FALLBACK_SECRET);
 
+  /*
+   * `ready` could previously be false with `missing` empty, and every caller
+   * interpolates that list — so a deployment that had set all three variables
+   * but reused the development credentials rendered "Missing: ." and named no
+   * cause at all. Being rejected for using the published default password is a
+   * distinct failure from a variable being absent, and it has to say so.
+   */
+  const usingDevDefaults =
+    IS_PRODUCTION &&
+    rawUser === DEV_FALLBACK_USERNAME &&
+    rawPass === DEV_FALLBACK_PASSWORD;
+
   const missing = [
-    !process.env.DASHBOARD_USERNAME?.trim() && 'DASHBOARD_USERNAME',
-    !process.env.DASHBOARD_PASSWORD?.trim() && 'DASHBOARD_PASSWORD',
+    !rawUser && 'DASHBOARD_USERNAME',
+    !rawPass && 'DASHBOARD_PASSWORD',
     !secretOk && 'AUTH_SECRET (32+ characters)',
+    usingDevDefaults &&
+      'a DASHBOARD_PASSWORD other than the development default (the built-in admin credentials are refused in production because they are published in this repository)',
   ].filter(Boolean) as string[];
 
   return { ready: configured && secretOk, missing, isProduction: IS_PRODUCTION };

@@ -136,9 +136,9 @@ export default function LoginPage() {
           {!readiness.ready && readiness.isProduction && (
             <div className="mt-6">
               <Note tone="critical" icon="alert">
-                <span className="font-semibold">Sign-in is not configured.</span> This deployment is
-                missing {readiness.missing.join(', ')}. Set them in the hosting panel’s environment
-                variables and restart the app. No one can sign in until then.
+                <span className="font-semibold">Sign-in is not configured.</span> This deployment
+                needs {readiness.missing.join('; ')}. Set that in the server environment, then
+                rebuild and restart. No one can sign in until then.
               </Note>
             </div>
           )}

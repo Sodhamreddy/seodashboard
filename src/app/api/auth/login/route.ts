@@ -72,8 +72,8 @@ export async function POST(request: Request) {
   if (!readiness.ready) {
     await new Promise((resolve) => setTimeout(resolve, 450));
     const message =
-      `Sign-in is not configured on this deployment. Missing: ${readiness.missing.join(', ')}. ` +
-      'Set these as environment variables in the hosting panel, then restart the app.';
+      `Sign-in is not configured on this deployment. It needs ${readiness.missing.join('; ')}. ` +
+      'Set these in the server environment, then rebuild and restart the app.';
     return isJson
       ? NextResponse.json({ error: message }, { status: 503 })
       : NextResponse.redirect(new URL('/login?error=setup', request.url), { status: 303 });
