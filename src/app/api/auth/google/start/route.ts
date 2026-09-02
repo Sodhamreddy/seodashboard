@@ -29,7 +29,7 @@ export async function GET(request: Request) {
 
   const authorize = new URL('https://accounts.google.com/o/oauth2/v2/auth');
   authorize.searchParams.set('client_id', clientId);
-  authorize.searchParams.set('redirect_uri', googleRedirectUri(request.url));
+  authorize.searchParams.set('redirect_uri', googleRedirectUri(request));
   authorize.searchParams.set('response_type', 'code');
   authorize.searchParams.set('scope', ['openid', 'email', ...requestedScopes()].join(' '));
   authorize.searchParams.set('access_type', 'offline');

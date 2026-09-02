@@ -90,11 +90,46 @@ export function googleOAuthClient() {
   };
 }
 
-/** The redirect URI must match one registered in Google Cloud exactly. */
-export function googleRedirectUri(requestUrl: string) {
-  const base = process.env.GOOGLE_OAUTH_REDIRECT_URI?.trim();
-  if (base) return base;
-  return new URL('/api/auth/google/callback', new URL(requestUrl).origin).toString();
+/**
+ * The redirect URI, which Google matches as an exact string.
+ *
+ * Behind a TLS-terminating reverse proxy this cannot be derived from
+ * `request.url` alone. nginx accepts HTTPS on the public host and forwards
+ * plain HTTP to Node on an internal port, so `request.url` is something like
+ * `http://localhost:7002/api/auth/google/start` — and the app duly sent
+ * `http://localhost:7002/api/auth/google/callback`, which matches nothing
+ * registered in Google Cloud and fails with `redirect_uri_mismatch`.
+ *
+ * Resolution order:
+ *   1. `GOOGLE_OAUTH_REDIRECT_URI` — explicit, and the only option that cannot
+ *      be got wrong. Recommended for any deployment behind a proxy.
+ *   2. The `X-Forwarded-Proto` / `X-Forwarded-Host` pair, which is what a
+ *      correctly configured nginx sends.
+ *   3. The request's own origin, which is right for local development.
+ *
+ * Trusting forwarded headers is safe here specifically because Google will only
+ * redirect to a URI already registered against the client: a spoofed header
+ * cannot redirect a user anywhere, it can only cause this same mismatch error.
+ */
+export function googleRedirectUri(request: Request | string) {
+  const override = process.env.GOOGLE_OAUTH_REDIRECT_URI?.trim();
+  if (override) return override;
+
+  // A bare string keeps the old call signature working for anything internal.
+  if (typeof request === 'string') {
+    return new URL('/api/auth/google/callback', new URL(request).origin).toString();
+  }
+
+  const url = new URL(request.url);
+  // A proxy chain sends a comma-separated list; the first entry is the client.
+  const first = (value: string | null) => value?.split(',')[0]?.trim() || '';
+  const proto = first(request.headers.get('x-forwarded-proto')) || url.protocol.replace(':', '');
+  const host =
+    first(request.headers.get('x-forwarded-host')) ||
+    first(request.headers.get('host')) ||
+    url.host;
+
+  return new URL('/api/auth/google/callback', `${proto}://${host}`).toString();
 }
 
 export async function getConnection(): Promise<GoogleConnection> {

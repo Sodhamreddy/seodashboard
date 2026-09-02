@@ -47,7 +47,7 @@ export async function GET(request: Request) {
         code,
         client_id: clientId,
         client_secret: clientSecret,
-        redirect_uri: googleRedirectUri(request.url),
+        redirect_uri: googleRedirectUri(request),
         grant_type: 'authorization_code',
       }),
       signal: AbortSignal.timeout(20_000),

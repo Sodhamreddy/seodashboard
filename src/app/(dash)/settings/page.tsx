@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { cookies } from 'next/headers';
+import { cookies, headers } from 'next/headers';
 import { Icon, type IconName } from '@/components/ui/Icon';
 import { Instructions } from '@/components/ui/Instructions';
 import { Badge, Card, CardHeader, Note, SectionHeading, cx } from '@/components/ui/primitives';
@@ -78,6 +78,27 @@ export default async function SettingsPage({
    * the page shows a green "Connected" badge beside a traffic page that says
    * nothing works.
    */
+  /*
+   * The exact redirect URI this deployment will send to Google.
+   *
+   * Shown because Google matches it as a literal string and the failure mode is
+   * an opaque `redirect_uri_mismatch` on Google's own page — with nothing in
+   * this app to compare against. Behind nginx the derived value is the internal
+   * origin (http://localhost:7002/...), not the public one, which is exactly
+   * the case that breaks.
+   */
+  const requestHeaders = headers();
+  const forwardedProto = requestHeaders.get('x-forwarded-proto')?.split(',')[0]?.trim();
+  const forwardedHost =
+    requestHeaders.get('x-forwarded-host')?.split(',')[0]?.trim() ||
+    requestHeaders.get('host')?.trim();
+  const redirectUriOverride = process.env.GOOGLE_OAUTH_REDIRECT_URI?.trim() ?? '';
+  const effectiveRedirectUri =
+    redirectUriOverride ||
+    (forwardedHost
+      ? `${forwardedProto || 'http'}://${forwardedHost}/api/auth/google/callback`
+      : '(cannot be determined without a request host)');
+
   const analyticsGranted = google.connected && hasAnalyticsScope(google.scopes);
   const needsAnalyticsReconsent = google.connected && !analyticsGranted;
   const googleStatus = searchParams.google ? GOOGLE_STATUS_MESSAGE[searchParams.google] : undefined;
@@ -303,6 +324,24 @@ export default async function SettingsPage({
         {/* Stated up front rather than left to the integrations list: a green
             "Connected" badge beside an empty Traffic page is the confusing
             case this notice exists to resolve. */}
+        {/* The single most common Google setup failure, made checkable. */}
+        <div className="mb-3">
+          <Note tone="neutral" icon="info">
+            <span className="font-semibold">Authorised redirect URI.</span> This deployment sends{' '}
+            <code className="break-all font-mono text-2xs">{effectiveRedirectUri}</code>. It must be
+            registered verbatim under the OAuth client in Google Cloud &rarr; Credentials, or
+            sign-in fails with <code className="font-mono">redirect_uri_mismatch</code>.
+            {!redirectUriOverride && (
+              <>
+                {' '}
+                This value is derived from the request headers. Behind a reverse proxy, set{' '}
+                <code className="font-mono">GOOGLE_OAUTH_REDIRECT_URI</code> to the public HTTPS URL
+                instead so it cannot be guessed wrong.
+              </>
+            )}
+          </Note>
+        </div>
+
         {needsAnalyticsReconsent && (
           <div className="mb-3">
             <Note tone="warning" icon="alert">
