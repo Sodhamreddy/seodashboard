@@ -26,24 +26,67 @@
 
 const first = (value: string | null) => value?.split(',')[0]?.trim() || '';
 
-export function publicOrigin(request: Request): string {
+/** Hosts that can never be the public origin of a deployed app. */
+const INTERNAL_HOST = /^(localhost|127\.\d+\.\d+\.\d+|\[?::1\]?|0\.0\.0\.0)(:\d+)?$/i;
+
+/**
+ * Resolves the origin and reports how, so a misconfiguration is diagnosable.
+ *
+ * The case worth naming: nginx forwarding `X-Forwarded-Proto` but replacing
+ * `Host` with the upstream address. The proto is then right and the host is
+ * `localhost:7002`, so the app happily builds `https://localhost:7002/...` —
+ * a URL that looks plausible and refuses every connection. No amount of header
+ * sniffing recovers the real hostname from that request; only `APP_ORIGIN` or a
+ * fixed proxy config can.
+ */
+export function resolvePublicOrigin(request: Request): {
+  origin: string;
+  source: 'env' | 'forwarded-host' | 'host-header' | 'request-url';
+  /** True when the resolved host cannot be reachable from a browser. */
+  looksInternal: boolean;
+} {
   const override = process.env.APP_ORIGIN?.trim();
   if (override) {
     try {
-      return new URL(override).origin;
+      return { origin: new URL(override).origin, source: 'env', looksInternal: false };
     } catch {
-      // A malformed APP_ORIGIN must not take the app down; fall through.
+      /* malformed override must not break the app */
     }
   }
 
   const url = new URL(request.url);
   const proto = first(request.headers.get('x-forwarded-proto')) || url.protocol.replace(':', '');
-  const host =
-    first(request.headers.get('x-forwarded-host')) ||
-    first(request.headers.get('host')) ||
-    url.host;
+  const forwardedHost = first(request.headers.get('x-forwarded-host'));
+  const hostHeader = first(request.headers.get('host'));
 
-  return `${proto}://${host}`;
+  const host = forwardedHost || hostHeader || url.host;
+  const source = forwardedHost
+    ? 'forwarded-host'
+    : hostHeader
+      ? 'host-header'
+      : 'request-url';
+
+  // Only a problem when the request clearly arrived through a proxy: a plain
+  // localhost request in development is meant to resolve to localhost.
+  const viaProxy = Boolean(request.headers.get('x-forwarded-proto'));
+
+  return {
+    origin: `${proto}://${host}`,
+    source,
+    looksInternal: viaProxy && INTERNAL_HOST.test(host),
+  };
+}
+
+/**
+ * Whether a host can be reached from a browser. Exported so a server component
+ * working from `headers()` can run the same check without a `Request`.
+ */
+export function looksInternalHost(host: string) {
+  return INTERNAL_HOST.test(host.trim());
+}
+
+export function publicOrigin(request: Request): string {
+  return resolvePublicOrigin(request).origin;
 }
 
 /** An absolute URL on the public origin, for a server-issued redirect. */

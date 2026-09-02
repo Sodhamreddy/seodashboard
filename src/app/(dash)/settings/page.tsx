@@ -7,6 +7,7 @@ import { SESSION_COOKIE, verifySessionToken } from '@/lib/auth';
 import { getActiveDomain } from '@/lib/domain';
 import { loadClients } from '@/lib/clients';
 import { ClientIntegrations } from '@/components/panels/ClientIntegrations';
+import { looksInternalHost } from '@/lib/public-url';
 import {
   getConnection,
   gmbScopeEnabled,
@@ -92,6 +93,12 @@ export default async function SettingsPage({
   const forwardedHost =
     requestHeaders.get('x-forwarded-host')?.split(',')[0]?.trim() ||
     requestHeaders.get('host')?.trim();
+  const appOriginOverride = process.env.APP_ORIGIN?.trim() ?? '';
+  // nginx forwarding the protocol but replacing Host with the upstream address
+  // yields https://localhost:7002 — plausible-looking and unreachable. Nothing
+  // in the request can recover the real hostname, so this must be reported.
+  const proxyHidesHost =
+    !appOriginOverride && Boolean(forwardedProto) && looksInternalHost(forwardedHost ?? '');
   const redirectUriOverride = process.env.GOOGLE_OAUTH_REDIRECT_URI?.trim() ?? '';
   const effectiveRedirectUri =
     redirectUriOverride ||
@@ -324,6 +331,27 @@ export default async function SettingsPage({
         {/* Stated up front rather than left to the integrations list: a green
             "Connected" badge beside an empty Traffic page is the confusing
             case this notice exists to resolve. */}
+        {proxyHidesHost && (
+          <div className="mb-3">
+            <Note tone="critical" icon="alert">
+              <span className="font-semibold">
+                This deployment cannot work out its own public address.
+              </span>{' '}
+              The reverse proxy is forwarding the protocol but not the public host, so the app sees{' '}
+              <code className="font-mono">{forwardedHost}</code> and builds redirects to{' '}
+              <code className="break-all font-mono text-2xs">
+                {forwardedProto}://{forwardedHost}
+              </code>{' '}
+              — which no browser can reach. Sign-out and the Google callback will both land there.
+              Fix it either way: set{' '}
+              <code className="font-mono">APP_ORIGIN</code> to the public URL, or add{' '}
+              <code className="font-mono">proxy_set_header Host $host;</code> and{' '}
+              <code className="font-mono">proxy_set_header X-Forwarded-Host $host;</code> to the
+              nginx location block.
+            </Note>
+          </div>
+        )}
+
         {/* The single most common Google setup failure, made checkable. */}
         <div className="mb-3">
           <Note tone="neutral" icon="info">
