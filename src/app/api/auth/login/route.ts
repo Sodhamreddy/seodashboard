@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { publicOrigin, publicUrl } from '@/lib/public-url';
 import { SESSION_COOKIE, createSessionToken, sessionCookieOptions } from '@/lib/auth';
 import { authCredentials, authReadiness } from '@/lib/env';
 
@@ -14,8 +15,12 @@ export const runtime = 'nodejs';
  * (killing the protocol-relative form), resolve against the real request
  * origin, then require the origin to have survived. Anything else → dashboard.
  */
-function safeRedirectUrl(next: string, requestUrl: string) {
-  const base = new URL(requestUrl);
+function safeRedirectUrl(next: string, request: Request) {
+  // The base is the PUBLIC origin, not `request.url`. Behind a proxy the latter
+  // is the internal address, so a successful sign-in redirected the browser to
+  // localhost:7002/dashboard. The same-origin check below still holds, because
+  // both sides of the comparison now use that public origin.
+  const base = new URL(publicOrigin(request));
   const fallback = new URL('/dashboard', base);
 
   if (!next || !next.startsWith('/')) return fallback;
@@ -59,7 +64,7 @@ export async function POST(request: Request) {
     next = String(form.get('next') ?? '');
   }
 
-  const destination = safeRedirectUrl(next, request.url);
+  const destination = safeRedirectUrl(next, request);
 
   const expected = authCredentials();
 
@@ -76,7 +81,7 @@ export async function POST(request: Request) {
       'Set these in the server environment, then rebuild and restart the app.';
     return isJson
       ? NextResponse.json({ error: message }, { status: 503 })
-      : NextResponse.redirect(new URL('/login?error=setup', request.url), { status: 303 });
+      : NextResponse.redirect(publicUrl(request, '/login?error=setup'), { status: 303 });
   }
 
   const ok =
@@ -87,7 +92,7 @@ export async function POST(request: Request) {
     await new Promise((resolve) => setTimeout(resolve, 450));
     return isJson
       ? NextResponse.json({ error: 'Incorrect username or password.' }, { status: 401 })
-      : NextResponse.redirect(new URL('/login?error=1', request.url), { status: 303 });
+      : NextResponse.redirect(publicUrl(request, '/login?error=1'), { status: 303 });
   }
 
   const response = isJson

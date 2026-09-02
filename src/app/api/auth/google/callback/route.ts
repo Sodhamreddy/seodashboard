@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { publicUrl } from '@/lib/public-url';
 import {
   GOOGLE_STATE_COOKIE,
   fetchGoogleEmail,
@@ -12,7 +13,7 @@ export const runtime = 'nodejs';
 
 /** Everything lands back on /settings with a status the page can explain. */
 function back(request: Request, status: string) {
-  const response = NextResponse.redirect(new URL(`/settings?google=${status}`, request.url));
+  const response = NextResponse.redirect(publicUrl(request, `/settings?google=${status}`));
   response.cookies.set(GOOGLE_STATE_COOKIE, '', { path: '/', maxAge: 0 });
   return response;
 }

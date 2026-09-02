@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { publicUrl } from '@/lib/public-url';
 import {
   GOOGLE_STATE_COOKIE,
   googleOAuthClient,
@@ -20,7 +21,7 @@ export const runtime = 'nodejs';
 export async function GET(request: Request) {
   const { clientId, clientSecret } = googleOAuthClient();
   if (!clientId || !clientSecret) {
-    return NextResponse.redirect(new URL('/settings?google=missing_client', request.url));
+    return NextResponse.redirect(publicUrl(request, '/settings?google=missing_client'));
   }
 
   // Random state, echoed back by Google, compared against a cookie — this is
