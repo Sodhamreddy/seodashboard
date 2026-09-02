@@ -76,8 +76,11 @@ export function LibraryRail() {
 
   return (
     <div className="flex h-full min-h-0">
+      {/* The rail is hidden below lg: a fixed 300px panel leaves roughly 75px of
+          canvas on a phone. The builder is a pointer-and-keyboard tool, and on a
+          small screen the canvas is the only useful part of it. */}
       {open && (
-        <div className="flex h-full w-[300px] min-h-0 shrink-0 flex-col border-l border-hairline bg-surface">
+        <div className="hidden h-full w-[300px] min-h-0 shrink-0 flex-col border-l border-hairline bg-surface lg:flex">
           <header className="flex shrink-0 items-center justify-between border-b border-hairline px-3 py-2.5">
             <h2 className="text-xs font-semibold text-ink">
               {TABS.find((tab) => tab.key === state.rightTab)?.label}

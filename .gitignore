@@ -15,3 +15,10 @@ tsconfig.tsbuildinfo
 
 # Local snapshot / rules store written at runtime
 .data/
+
+# Backup copies of any file. Note that `.env*.local` does NOT match
+# `.env.local.bak`, so secrets files need this rule as well as their own.
+*.bak
+*.backup
+*.orig
+.env.*.bak
