@@ -9,6 +9,21 @@ import { LoginForm } from './LoginForm';
 
 export const metadata: Metadata = { title: 'Sign in' };
 
+/**
+ * Rendered per request, never prerendered.
+ *
+ * This page reads `DASHBOARD_USERNAME`, `DASHBOARD_PASSWORD` and `AUTH_SECRET`
+ * through `authReadiness()`. As a static route those were evaluated during
+ * `next build` — when a deploy has no environment variables yet — and the
+ * resulting "sign-in is not configured" notice was frozen into
+ * `login.html` and then served from the Next cache. Setting the variables on
+ * the server afterwards could never clear it, because nothing re-rendered.
+ *
+ * Any page whose output depends on runtime environment must opt out of static
+ * generation, however cheap the page looks.
+ */
+export const dynamic = 'force-dynamic';
+
 export default function LoginPage() {
   const readiness = authReadiness();
 
