@@ -205,8 +205,20 @@ export function reducer(state: EditorState, action: Action): EditorState {
       return { ...next, past: [...state.past, state.doc].slice(-HISTORY_LIMIT), future: [] };
     }
 
-    case 'patchDoc':
-      return commit(state, { ...state.doc, ...action.patch }, action.history ?? true);
+    case 'patchDoc': {
+      const next = commit(state, { ...state.doc, ...action.patch }, action.history ?? true);
+      /*
+       * Binding the report to a different client invalidates every cached
+       * metric immediately. Without this the widgets kept rendering the
+       * previous client's numbers until the new fetch landed — and kept them
+       * for good if that fetch failed, which is the worst version of this bug:
+       * confident figures attributed to the wrong business.
+       */
+      if ('clientDomain' in action.patch && action.patch.clientDomain !== state.doc.clientDomain) {
+        return { ...next, live: null, liveStatus: 'idle' };
+      }
+      return next;
+    }
 
     case 'snapshot':
       return { ...state, past: [...state.past, state.doc].slice(-HISTORY_LIMIT), future: [] };
@@ -653,11 +665,15 @@ export function useMetricLookup() {
   const { dataMode, range } = state.doc;
   const live = state.live;
   const liveStatus = state.liveStatus;
+  const domain = state.doc.clientDomain ?? '';
 
   const lookup = useCallback<MetricLookup>(
     (metricId) => {
       if (dataMode === 'sample') return sampleMetric(metricId, range);
-      if (!live || live.range !== range) {
+      // The domain is part of what makes a cached metric the right one, the
+      // same as the range: a cache belonging to another client is a miss, not
+      // a value to render.
+      if (!live || live.range !== range || live.domain !== domain) {
         return {
           state: 'unavailable',
           reason: liveStatus === 'error' ? 'Live data request failed' : 'Loading live data…',
@@ -665,7 +681,7 @@ export function useMetricLookup() {
       }
       return live.metrics[metricId] ?? { state: 'unavailable', reason: 'No live adapter' };
     },
-    [dataMode, range, live, liveStatus],
+    [dataMode, range, domain, live, liveStatus],
   );
 
   const resolve = useCallback(

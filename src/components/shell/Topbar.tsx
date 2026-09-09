@@ -1,6 +1,6 @@
 'use client';
 
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Icon, type IconName } from '@/components/ui/Icon';
 import { Badge, Button, cx } from '@/components/ui/primitives';
@@ -110,7 +110,6 @@ function ThemeToggle() {
  * is a convenience layer on top of it, not a new scoping mechanism.
  */
 function DomainSwitcher({ domain }: { domain: string }) {
-  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [clients, setClients] = useState<Client[] | null>(null);
   const [filter, setFilter] = useState('');
@@ -163,7 +162,19 @@ function DomainSwitcher({ domain }: { domain: string }) {
       return;
     }
     setOpen(false);
-    router.refresh();
+    /*
+     * A full document load, not `router.refresh()`.
+     *
+     * The active client is a cookie every server component reads, so switching
+     * it re-scopes the entire app. `router.refresh()` re-renders the route
+     * that happens to be mounted, but the App Router keeps the RSC payloads of
+     * recently visited routes in its client-side cache — so navigating back to
+     * a page visited under the previous client served that client's numbers
+     * under the new client's name. Reloading is the only thing that drops that
+     * cache wholesale, and it costs one navigation on an action taken a few
+     * times a day.
+     */
+    window.location.reload();
   }
 
   async function submitAdd(event: React.FormEvent) {
