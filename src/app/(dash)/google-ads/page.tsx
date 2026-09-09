@@ -4,19 +4,45 @@ import { ChartFrame, MagnitudeBars, SimpleTable, TrendLine } from '@/components/
 import { SERIES } from '@/lib/chart-palette';
 import { CampaignTable } from '@/components/panels/CampaignTable';
 import { SearchTermsTable } from '@/components/panels/SearchTermsTable';
+import { RangeFilter } from '@/components/shell/RangeFilter';
+import { Icon } from '@/components/ui/Icon';
 import { Meter, StatTile } from '@/components/ui/data';
-import { Button, Card, CardHeader, EmptyState, Note, SectionHeading } from '@/components/ui/primitives';
+import {
+  Button,
+  Card,
+  CardHeader,
+  EmptyState,
+  Note,
+  SectionHeading,
+  cx,
+} from '@/components/ui/primitives';
 import { getActiveDomain } from '@/lib/domain';
 import { compactNumber, currency, number, percent, shortDate } from '@/lib/format';
 import { getAdsReport } from '@/lib/providers/ads';
 import { loadAlertRules } from '@/lib/providers/alerts';
+import { DEFAULT_RANGE, formatWindow, resolveRange } from '@/lib/range';
 
 export const metadata: Metadata = { title: 'Google Ads Performance' };
 export const dynamic = 'force-dynamic';
 
-export default async function GoogleAdsPage() {
+export default async function GoogleAdsPage({
+  searchParams,
+}: {
+  searchParams?: {
+    range?: string | string[];
+    from?: string | string[];
+    to?: string | string[];
+    budget?: string | string[];
+  };
+}) {
   const domain = getActiveDomain();
-  const report = await getAdsReport(domain, 30);
+  const range = resolveRange(searchParams?.range, searchParams?.from, searchParams?.to);
+  const firstParam = (value: string | string[] | undefined) =>
+    Array.isArray(value) ? value[0] : value;
+  const budgetLimitedOnly = firstParam(searchParams?.budget) === 'limited';
+  const report = await getAdsReport(domain, range.days, range.custom);
+  // "Last month" is a calendar window, so a plain day count would misname it.
+  const spanLabel = range.key === 'lastMonth' ? 'last month' : `${range.days}d`;
   /*
    * Pacing is measured against the account budget someone actually set on the
    * alert rules page, not against the sum of the campaign daily budgets —
@@ -26,6 +52,35 @@ export default async function GoogleAdsPage() {
   const accountBudget = report.available
     ? ((await loadAlertRules(report)).find((rule) => rule.scope === 'account')?.monthlyBudget ?? 0)
     : 0;
+
+  /*
+   * Campaigns "limited by budget" are the ones worth acting on — they have
+   * demand they cannot pay for — so they get a filter rather than only a badge
+   * inside a sortable column. The filter lives in the URL alongside the window
+   * so a link carries both.
+   */
+  const limitedCount = report.campaigns.filter((campaign) => campaign.status === 'limited').length;
+  const campaigns = budgetLimitedOnly
+    ? report.campaigns.filter((campaign) => campaign.status === 'limited')
+    : report.campaigns;
+
+  const windowParams = new URLSearchParams();
+  if (range.key === 'custom' && range.custom) {
+    windowParams.set('range', 'custom');
+    windowParams.set('from', range.custom.from);
+    windowParams.set('to', range.custom.to);
+  } else if (range.key !== DEFAULT_RANGE) {
+    windowParams.set('range', range.key);
+  }
+  if (!budgetLimitedOnly) windowParams.set('budget', 'limited');
+  const budgetFilterHref = windowParams.toString()
+    ? `/google-ads?${windowParams.toString()}`
+    : '/google-ads';
+
+  const windowLabel =
+    report.daily.length > 0
+      ? formatWindow(report.daily[0].date, report.daily[report.daily.length - 1].date)
+      : range.label;
 
   // Seeding is suppressed for a client with no Ads account, so there is
   // nothing to render here — see AdsReport.available.
@@ -57,13 +112,46 @@ export default async function GoogleAdsPage() {
         </Note>
       )}
 
+      {/* ── Filters ─────────────────────────────────────────────────── */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="text-xs text-ink-secondary">
+          Account <span className="font-medium text-ink">{report.customerId || '—'}</span> ·{' '}
+          {range.label}
+        </p>
+        <div className="flex flex-wrap items-center gap-2">
+          <Link
+            href={budgetFilterHref}
+            scroll={false}
+            aria-pressed={budgetLimitedOnly}
+            className={cx(
+              'flex h-9 items-center gap-2 rounded-lg border px-3 text-2xs transition-colors',
+              budgetLimitedOnly
+                ? 'border-transparent bg-accent-soft font-medium text-accent'
+                : 'border-hairline bg-surface text-ink-secondary hover:bg-surface-sunken',
+            )}
+          >
+            <Icon name="alert" size={13} />
+            Limited by budget
+            <span className="tnum rounded-full bg-surface-sunken px-1.5 text-2xs text-ink-muted">
+              {limitedCount}
+            </span>
+          </Link>
+          <RangeFilter
+            active={range.key}
+            windowLabel={windowLabel}
+            activeLabel={range.label}
+            customWindow={range.custom}
+          />
+        </div>
+      </div>
+
       {/* ── Account KPIs ────────────────────────────────────────────── */}
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <StatTile
-          label="Spend (30d)"
+          label={`Spend (${spanLabel})`}
           value={currency(report.summary.spend)}
           delta={report.summary.spendDelta}
-          deltaLabel="vs prior 30d"
+          deltaLabel={`vs prior ${range.days}d`}
           icon="bars"
           spark={report.daily.map((day) => day.spend)}
         />
@@ -71,7 +159,7 @@ export default async function GoogleAdsPage() {
           label="Conversions"
           value={number(report.summary.conversions, 1)}
           delta={report.summary.conversionsDelta}
-          deltaLabel="vs prior 30d"
+          deltaLabel={`vs prior ${range.days}d`}
           icon="target"
           spark={report.daily.map((day) => day.conversions)}
         />
@@ -216,7 +304,7 @@ export default async function GoogleAdsPage() {
       <section className="grid items-start gap-4 xl:grid-cols-2">
         <ChartFrame
           title="Conversions by campaign"
-          subtitle={`Top 10 of ${report.conversionsByCampaign.length} by conversions, last 30 days`}
+          subtitle={`Top 10 of ${report.conversionsByCampaign.length} by conversions, ${spanLabel}`}
           table={
             <SimpleTable
               headers={['Campaign', 'Conversions', 'Spend']}
@@ -250,9 +338,23 @@ export default async function GoogleAdsPage() {
       <section>
         <SectionHeading
           title="Campaigns"
-          subtitle={`Account ${report.customerId} · last ${report.rangeDays} days`}
+          subtitle={
+            budgetLimitedOnly
+              ? `${campaigns.length} of ${report.campaigns.length} campaigns limited by budget · ${spanLabel}`
+              : `Account ${report.customerId} · ${spanLabel}`
+          }
         />
-        <CampaignTable campaigns={report.campaigns} />
+        {budgetLimitedOnly && campaigns.length === 0 ? (
+          <Note tone="good" icon="check">
+            No campaign is losing impression share to its budget in this window.{' '}
+            <Link href="/google-ads" className="text-accent underline underline-offset-2">
+              Show all campaigns
+            </Link>
+            .
+          </Note>
+        ) : (
+          <CampaignTable campaigns={campaigns} />
+        )}
       </section>
     </div>
   );
