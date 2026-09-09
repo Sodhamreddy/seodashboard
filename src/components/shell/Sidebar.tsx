@@ -33,14 +33,21 @@ export function Sidebar({
         </span>
       </Link>
 
-      <div className="flex-1 space-y-4">
+      <div className="flex-1 space-y-3">
         {NAV_GROUPS.map((group) => {
           const items = NAV_ITEMS.filter((item) => item.group === group);
           if (items.length === 0) return null;
 
           return (
-            <div key={group}>
-              <p className="mb-1.5 px-2 text-2xs font-bold uppercase tracking-[0.1em] text-ink-muted">
+            <div
+              key={group}
+              className="border-t border-hairline pt-3 first:border-0 first:pt-0"
+            >
+              {/* Section headings carry full ink, not muted: at this size a
+                  muted uppercase label sits under the contrast floor and the
+                  groups stop reading as structure. */}
+              <p className="mb-2 flex items-center gap-2 px-2 text-[0.8rem] font-bold uppercase tracking-[0.07em] text-ink">
+                <span aria-hidden="true" className="h-3 w-0.5 shrink-0 rounded-full bg-accent" />
                 {group}
               </p>
               <ul className="space-y-0.5">
@@ -57,10 +64,10 @@ export function Sidebar({
                         onClick={onNavigate}
                         aria-current={active ? 'page' : undefined}
                         className={cx(
-                          'group flex items-center gap-2.5 rounded-lg px-2 py-2 text-[0.8rem] transition-colors',
+                          'group flex items-center gap-2.5 rounded-lg px-2 py-2 text-[0.85rem] transition-colors',
                           active && 'nav-active font-semibold',
                           !active && promoted && 'bg-accent-soft font-semibold text-accent',
-                          !active && !promoted && 'font-medium text-ink-secondary hover:bg-surface-raised hover:text-ink',
+                          !active && !promoted && 'font-medium text-ink hover:bg-surface-raised',
                         )}
                       >
                         <Icon name={item.icon} size={16} className="shrink-0" />
