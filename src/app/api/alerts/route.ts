@@ -30,10 +30,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'No rules supplied.' }, { status: 400 });
     }
 
-    // Normalise before persisting: budgets positive, thresholds sorted 1–200.
+    // Normalise before persisting: budgets non-negative, thresholds sorted
+    // 1–200. Zero is allowed and means "no budget set yet" — the evaluator
+    // skips those rules rather than pacing spend against nothing.
     const rules: AlertRule[] = body.rules.map((rule) => ({
       ...rule,
-      monthlyBudget: Math.max(1, Math.round(Number(rule.monthlyBudget) || 0)),
+      monthlyBudget: Math.max(0, Math.round(Number(rule.monthlyBudget) || 0)),
       thresholds: Array.from(
         new Set(
           (rule.thresholds ?? [])

@@ -43,28 +43,45 @@ export type AlertEvaluation = {
 
 const DEFAULT_THRESHOLDS = [50, 75, 90, 100];
 
-/** Budget alerts are only meaningful against real thresholds, so seed sane ones. */
+/**
+ * Budget alerts are only meaningful against real thresholds, so seed sane ones.
+ *
+ * Only campaigns that can spend in the current calendar month get a rule: the
+ * report window reaches back into earlier months, so paused and finished
+ * campaigns also come back, and a rule for one of them can never fire — it
+ * just pads the table and its budget the account total.
+ */
 export function defaultRules(report: AdsReport): AlertRule[] {
   return [
     {
       id: 'account',
       scope: 'account',
       label: 'Account total',
-      monthlyBudget: Math.round(report.summary.monthlyBudget),
+      /*
+       * Deliberately not the sum of the campaign budgets. Campaign budgets are
+       * daily caps that Google lets a campaign overshoot day to day, and they
+       * rarely add up to the figure the account is actually managed against —
+       * summing them produced a total nobody had ever set. It stays empty and
+       * off until someone enters the real account budget, which then persists
+       * in rules.json and wins over this default.
+       */
+      monthlyBudget: 0,
       thresholds: DEFAULT_THRESHOLDS,
-      enabled: true,
+      enabled: false,
       notify: { webhook: !!process.env.ALERT_WEBHOOK_URL, email: !!process.env.ALERT_EMAIL_TO },
     },
-    ...report.campaigns.map((campaign) => ({
-      id: campaign.id,
-      scope: 'campaign' as const,
-      campaignId: campaign.id,
-      label: campaign.name,
-      monthlyBudget: Math.round(campaign.budgetMonthly),
-      thresholds: DEFAULT_THRESHOLDS,
-      enabled: campaign.status !== 'paused',
-      notify: { webhook: !!process.env.ALERT_WEBHOOK_URL, email: false },
-    })),
+    ...report.campaigns
+      .filter((campaign) => campaign.activeThisMonth)
+      .map((campaign) => ({
+        id: campaign.id,
+        scope: 'campaign' as const,
+        campaignId: campaign.id,
+        label: campaign.name,
+        monthlyBudget: Math.round(campaign.budgetMonthly),
+        thresholds: DEFAULT_THRESHOLDS,
+        enabled: campaign.budgetMonthly > 0,
+        notify: { webhook: !!process.env.ALERT_WEBHOOK_URL, email: false },
+      })),
   ];
 }
 
@@ -105,7 +122,9 @@ export function evaluateAlerts(report: AdsReport, rules: AlertRule[]): AlertEval
   const daysLeft = daysLeftInMonth();
 
   return rules
-    .filter((rule) => rule.enabled)
+    // A rule with no budget has nothing to pace against; evaluating it would
+    // measure spend against zero and report a permanent overspend.
+    .filter((rule) => rule.enabled && rule.monthlyBudget > 0)
     .map((rule) => {
       const spendMtd =
         rule.scope === 'account'

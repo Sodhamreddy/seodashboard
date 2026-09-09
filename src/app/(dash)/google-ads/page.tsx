@@ -9,6 +9,7 @@ import { Button, Card, CardHeader, EmptyState, Note, SectionHeading } from '@/co
 import { getActiveDomain } from '@/lib/domain';
 import { compactNumber, currency, number, percent, shortDate } from '@/lib/format';
 import { getAdsReport } from '@/lib/providers/ads';
+import { loadAlertRules } from '@/lib/providers/alerts';
 
 export const metadata: Metadata = { title: 'Google Ads Performance' };
 export const dynamic = 'force-dynamic';
@@ -16,6 +17,15 @@ export const dynamic = 'force-dynamic';
 export default async function GoogleAdsPage() {
   const domain = getActiveDomain();
   const report = await getAdsReport(domain, 30);
+  /*
+   * Pacing is measured against the account budget someone actually set on the
+   * alert rules page, not against the sum of the campaign daily budgets —
+   * that sum is a number nobody chose and it moves every time a campaign is
+   * paused.
+   */
+  const accountBudget = report.available
+    ? ((await loadAlertRules(report)).find((rule) => rule.scope === 'account')?.monthlyBudget ?? 0)
+    : 0;
 
   // Seeding is suppressed for a client with no Ads account, so there is
   // nothing to render here — see AdsReport.available.
@@ -149,13 +159,24 @@ export default async function GoogleAdsPage() {
             }
           />
           <div className="space-y-4">
-            <Meter
-              value={report.summary.spendMtd}
-              max={report.summary.monthlyBudget}
-              label="Account total"
-              valueLabel={`${currency(report.summary.spendMtd)} / ${currency(report.summary.monthlyBudget)}`}
-              tone="accent"
-            />
+            {accountBudget > 0 ? (
+              <Meter
+                value={report.summary.spendMtd}
+                max={accountBudget}
+                label="Account total"
+                valueLabel={`${currency(report.summary.spendMtd)} / ${currency(accountBudget)}`}
+                tone="accent"
+              />
+            ) : (
+              <Note tone="neutral" icon="info">
+                {currency(report.summary.spendMtd)} spent month to date. Set an account monthly budget on
+                the{' '}
+                <Link href="/budget-alerts" className="text-accent underline underline-offset-2">
+                  alert rules
+                </Link>{' '}
+                page to pace it against a target.
+              </Note>
+            )}
             <dl className="grid grid-cols-2 gap-4 border-t border-hairline pt-4">
               <div>
                 <dt className="text-2xs uppercase tracking-[0.06em] text-ink-muted">Customer ID</dt>

@@ -69,7 +69,7 @@ export default async function BudgetAlertsPage() {
           footnote={
             account
               ? `${percent(account.consumedPct, 0)} of ${currency(account.monthlyBudget)} budget`
-              : undefined
+              : 'No account budget set'
           }
           icon="bars"
         />

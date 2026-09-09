@@ -406,7 +406,9 @@ export default async function OverviewPage({
               </div>
             </>
           ) : (
-            <p className="text-xs text-ink-muted">No account-level rule is enabled.</p>
+            <p className="text-xs text-ink-muted">
+              No account monthly budget is set, so there is nothing to pace month-to-date spend against.
+            </p>
           )}
         </Panel>
 

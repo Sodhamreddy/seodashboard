@@ -128,8 +128,11 @@ export function AlertRulesEditor({
           <span className="text-ink-muted">$</span>
           <input
             type="number"
-            min={1}
-            value={rule.monthlyBudget}
+            min={0}
+            // Blank rather than a literal 0, so an unset budget reads as
+            // something to fill in rather than a budget of nothing.
+            value={rule.monthlyBudget || ''}
+            placeholder="not set"
             onChange={(event) => updateRule(rule.id, { monthlyBudget: Number(event.target.value) })}
             className="h-8 w-24 rounded-md border border-hairline bg-surface-raised px-2 text-xs tnum text-ink focus:border-accent focus:outline-none"
           />
@@ -168,7 +171,7 @@ export function AlertRulesEditor({
             <span className="ml-1.5 text-2xs text-ink-muted">{percent(evaluation.consumedPct, 0)}</span>
           </>
         ) : (
-          <span className="text-ink-muted">disabled</span>
+          <span className="text-ink-muted">{rule.monthlyBudget > 0 ? 'disabled' : 'no budget set'}</span>
         );
       },
       sortValue: (rule) => evaluationByRuleId.get(rule.id)?.spendMtd ?? -1,
@@ -185,7 +188,7 @@ export function AlertRulesEditor({
           </Badge>
         ) : (
           <Badge tone="neutral" icon={null}>
-            not evaluated
+            {rule.enabled && rule.monthlyBudget <= 0 ? 'needs a budget' : 'not evaluated'}
           </Badge>
         );
       },
@@ -307,6 +310,8 @@ export function AlertRulesEditor({
             <p className="mt-1 text-xs text-ink-secondary">
               Budgets and thresholds persist to <code className="font-mono">.data/alerts/rules.json</code>.
               A rule fires when month-to-date spend crosses a threshold percentage of its monthly budget.
+              Campaign budgets come from Google Ads; the account total is yours to set — it is not the sum
+              of the campaigns below.
             </p>
           </div>
           <div className="flex items-center gap-2">

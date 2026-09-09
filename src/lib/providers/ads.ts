@@ -25,7 +25,19 @@ export type Campaign = {
   impressionShare: number;
   /** Month-to-date spend, used by the budget alert engine. */
   spendMtd: number;
+  /**
+   * Budget this campaign can actually consume in the current calendar month.
+   * Zero when the campaign cannot spend in it at all — paused, or scheduled
+   * entirely outside it.
+   */
   budgetMonthly: number;
+  /**
+   * Whether the campaign can spend in the current calendar month. The report
+   * window can reach back into previous months, so it also carries campaigns
+   * that have since been paused or have ended; those still belong in the
+   * performance tables but must not contribute to this month's budget.
+   */
+  activeThisMonth: boolean;
 };
 
 export type AdsReport = {
@@ -57,6 +69,11 @@ export type AdsReport = {
     cpa: number;
     conversionValue: number;
     roas: number;
+    /**
+     * Sum of the campaign budgets that can be charged this month. It is a
+     * property of the campaigns, not the account's own budget — the figure
+     * pacing is measured against is the one set on the alert rules page.
+     */
     monthlyBudget: number;
     spendMtd: number;
   };
@@ -151,6 +168,7 @@ async function fetchLiveAdsReport(
       runGaql(
         customerId,
         `SELECT campaign.id, campaign.name, campaign.status, campaign.advertising_channel_type,
+                campaign.start_date, campaign.end_date,
                 campaign_budget.amount_micros,
                 metrics.cost_micros, metrics.impressions, metrics.clicks,
                 metrics.conversions, metrics.conversions_value,
@@ -199,8 +217,6 @@ async function fetchLiveAdsReport(
     mtdByCampaign.set(String(row.campaign?.id), microsToUnits(row.metrics?.costMicros));
   }
 
-  const monthDays = daysInCurrentMonth();
-
   const campaigns: Campaign[] = campaignRows
     .filter((row: GaqlRow) => row.campaign?.status !== 'REMOVED')
     .map((row: GaqlRow) => {
@@ -213,12 +229,23 @@ async function fetchLiveAdsReport(
       const conversionValue = Number(row.metrics?.conversionsValue ?? 0);
       const dailyBudget = microsToUnits(row.campaignBudget?.amountMicros);
       const budgetLostShare = Number(row.metrics?.searchBudgetLostImpressionShare ?? 0);
+      const status: CampaignStatus =
+        row.campaign?.status === 'PAUSED' ? 'paused' : budgetLostShare > 0.01 ? 'limited' : 'enabled';
+      /*
+       * Budget is what the campaign can still be charged this month, not a
+       * notional daily-budget × 30. A paused campaign, or one whose schedule
+       * ran out before the month began, is charged nothing — counting it was
+       * inflating the account budget with campaigns that only ran in an
+       * earlier month, which the range query happily returns.
+       */
+      const activeDays = activeDaysThisMonth(row.campaign?.startDate, row.campaign?.endDate);
+      const activeThisMonth = status !== 'paused' && activeDays > 0;
 
       const campaign: Campaign = {
         id,
         name: String(row.campaign?.name ?? id),
         channel: mapChannel(row.campaign?.advertisingChannelType),
-        status: row.campaign?.status === 'PAUSED' ? 'paused' : budgetLostShare > 0.01 ? 'limited' : 'enabled',
+        status,
         dailyBudget: Number(dailyBudget.toFixed(2)),
         spend: Number(spend.toFixed(2)),
         impressions,
@@ -231,7 +258,8 @@ async function fetchLiveAdsReport(
         roas: spend > 0 ? Number((conversionValue / spend).toFixed(2)) : 0,
         impressionShare: Number((Number(row.metrics?.searchImpressionShare ?? 0) * 100).toFixed(1)),
         spendMtd: Number((mtdByCampaign.get(id) ?? 0).toFixed(2)),
-        budgetMonthly: Number((dailyBudget * monthDays).toFixed(2)),
+        budgetMonthly: activeThisMonth ? Number((dailyBudget * activeDays).toFixed(2)) : 0,
+        activeThisMonth,
       };
       return campaign;
     });
@@ -517,13 +545,16 @@ async function buildAdsReport(
     const conversions = Number((clicks * floatBetween(random, 0.02, 0.16)).toFixed(1));
     const value = conversions * floatBetween(random, 80, 360);
     const dailyBudget = Math.round((spend / rangeDays) * floatBetween(random, 1.05, 1.45));
-    const budgetMonthly = dailyBudget * 30;
+    const status: CampaignStatus =
+      index === CAMPAIGN_SEEDS.length - 1 ? 'paused' : index === 1 ? 'limited' : 'enabled';
+    // Same rule as the live path: a paused campaign carries no month budget.
+    const activeThisMonth = status !== 'paused';
 
     return {
       id: `camp-${index}`,
       name: seed.name,
       channel: seed.channel,
-      status: index === CAMPAIGN_SEEDS.length - 1 ? 'paused' : index === 1 ? 'limited' : 'enabled',
+      status,
       dailyBudget,
       spend: Number(spend.toFixed(2)),
       impressions,
@@ -536,7 +567,8 @@ async function buildAdsReport(
       roas: spend > 0 ? Number((value / spend).toFixed(2)) : 0,
       impressionShare: Number(floatBetween(random, 22, 88).toFixed(1)),
       spendMtd: Number(((spend / rangeDays) * currentDay * floatBetween(random, 0.9, 1.1)).toFixed(2)),
-      budgetMonthly,
+      budgetMonthly: activeThisMonth ? dailyBudget * daysInCurrentMonth() : 0,
+      activeThisMonth,
     };
   });
 
@@ -618,4 +650,32 @@ export function daysElapsedInMonth() {
 export function daysInCurrentMonth() {
   const today = todayUtc();
   return new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() + 1, 0)).getUTCDate();
+}
+
+/** First and last day of the current calendar month, as YYYY-MM-DD (UTC). */
+function currentMonthBounds() {
+  const today = todayUtc();
+  const year = today.getUTCFullYear();
+  const month = today.getUTCMonth();
+  const iso = (date: Date) => date.toISOString().slice(0, 10);
+  return {
+    start: iso(new Date(Date.UTC(year, month, 1))),
+    end: iso(new Date(Date.UTC(year, month + 1, 0))),
+  };
+}
+
+/**
+ * How many days of the current calendar month a campaign schedule covers.
+ * Google reports an open-ended campaign as ending 2037-12-30, so the common
+ * case is the whole month; a campaign that ended last month covers none of
+ * it, and one that starts or stops mid-month is prorated rather than being
+ * billed a full month of daily budget it can never spend.
+ */
+export function activeDaysThisMonth(startDate?: string, endDate?: string) {
+  const { start, end } = currentMonthBounds();
+  const from = startDate && startDate > start ? startDate : start;
+  const to = endDate && endDate < end ? endDate : end;
+  if (to < from) return 0;
+  const days = Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000) + 1;
+  return Number.isFinite(days) ? Math.max(0, days) : 0;
 }
