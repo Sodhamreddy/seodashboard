@@ -241,7 +241,7 @@ function DomainSwitcher({ domain }: { domain: string }) {
         <span className="min-w-0">
           <span className="flex items-center gap-1.5">
             <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-status-good" />
-            <span className="max-w-[160px] truncate text-xs font-semibold leading-tight text-accent">
+            <span className="max-w-[180px] truncate text-sm font-semibold leading-tight text-accent">
               {activeClient ? activeClient.name : domain}
             </span>
           </span>
@@ -257,7 +257,7 @@ function DomainSwitcher({ domain }: { domain: string }) {
           ref={popoverRef}
           className="absolute right-0 z-50 mt-2 w-80 rounded-xl border border-hairline bg-surface-raised p-3 shadow-lift"
         >
-          <p className="mb-2 flex items-center justify-between text-2xs font-semibold uppercase tracking-[0.08em] text-ink-muted">
+          <p className="mb-2 flex items-center justify-between text-xs font-bold uppercase tracking-[0.07em] text-ink">
             Clients
             {clients && clients.length > 0 && <span className="tnum">{clients.length}</span>}
           </p>
@@ -286,19 +286,26 @@ function DomainSwitcher({ domain }: { domain: string }) {
                         onClick={() => switchTo(client.domain)}
                         disabled={pending}
                         className={cx(
-                          'flex min-w-0 flex-1 items-center gap-2 rounded-lg px-2 py-1.5 text-left text-xs transition-colors',
+                          'flex min-w-0 flex-1 items-center gap-2 rounded-lg px-2.5 py-2 text-left transition-colors',
                           active
-                            ? 'bg-accent-soft font-medium text-accent'
+                            ? 'bg-accent-soft text-accent ring-1 ring-inset ring-accent'
                             : 'text-ink hover:bg-surface-sunken',
                         )}
                       >
                         <span className="min-w-0 flex-1">
-                          <span className="block truncate">{client.name}</span>
-                          <span className="block truncate text-2xs text-ink-muted">
+                          <span className="block truncate text-sm font-semibold leading-tight">
+                            {client.name}
+                          </span>
+                          <span
+                            className={cx(
+                              'mt-0.5 block truncate text-2xs leading-tight',
+                              active ? 'text-ink-secondary' : 'text-ink-muted',
+                            )}
+                          >
                             {client.domain}
                           </span>
                         </span>
-                        {active && <Icon name="check" size={13} className="shrink-0" />}
+                        {active && <Icon name="check" size={14} className="shrink-0" />}
                       </button>
                       <button
                         type="button"
