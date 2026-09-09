@@ -8,6 +8,7 @@ import {
   earliestSelectableDate,
   isoToday,
   normalizeWindow,
+  rangeHint,
   type RangeKey,
 } from '@/lib/range';
 
@@ -154,7 +155,7 @@ export function RangeFilter({
                     )}
                   >
                     <span className="flex-1">{range.label}</span>
-                    <span className="tnum text-2xs text-ink-muted">{range.days}d</span>
+                    <span className="tnum text-2xs text-ink-muted">{rangeHint(range)}</span>
                     {isActive && <Icon name="check" size={13} className="shrink-0" />}
                     {pending === range.key && !isActive && (
                       <Icon name="refresh" size={13} className="shrink-0 animate-spin" />

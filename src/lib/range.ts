@@ -8,11 +8,23 @@
  * `getBacklinkReport` should resolve its window through here.
  */
 
-export type RangeKey = '7d' | '30d' | '90d' | '180d' | '365d';
+export type RangeKey = '7d' | '30d' | 'lastMonth' | '60d' | '90d' | '180d' | '365d';
 
-export const DASH_RANGES: { key: RangeKey; label: string; short: string; days: number }[] = [
+export const DASH_RANGES: {
+  key: RangeKey;
+  label: string;
+  short: string;
+  days: number;
+  /**
+   * A fixed calendar window rather than a rolling one, so `days` here is only
+   * nominal — the real span is computed when the range is resolved.
+   */
+  calendar?: boolean;
+}[] = [
   { key: '7d', label: 'Last 7 days', short: '7d', days: 7 },
   { key: '30d', label: 'Last 30 days', short: '30d', days: 30 },
+  { key: 'lastMonth', label: 'Last month', short: 'month', days: 30, calendar: true },
+  { key: '60d', label: 'Last 60 days', short: '60d', days: 60 },
   { key: '90d', label: 'Last 90 days', short: '90d', days: 90 },
   { key: '180d', label: 'Last 6 months', short: '6m', days: 180 },
   { key: '365d', label: 'Last 12 months', short: '12m', days: 365 },
@@ -34,9 +46,13 @@ export type DateWindow = { from: string; to: string };
 export type ResolvedRange = {
   key: RangeKey | 'custom';
   label: string;
-  /** Day span. For a custom window this is `to - from`, inclusive. */
+  /** Day span. For an explicit window this is `to - from`, inclusive. */
   days: number;
-  /** Present only for a custom range. Absent means "rolling, ending today". */
+  /**
+   * The explicit dates to ask providers for. Present for a custom range and for
+   * a calendar preset such as "Last month"; absent means "rolling, ending
+   * today", which is what the day-count presets are.
+   */
   custom?: DateWindow;
 };
 
@@ -70,6 +86,22 @@ export function resolveRange(
   to?: string | string[],
 ): ResolvedRange {
   const key = Array.isArray(input) ? input[0] : input;
+
+  /*
+   * "Last month" is a calendar month, not a rolling 30 days — on 9 September it
+   * is 1–31 August, which is the window an advertiser reconciling an invoice
+   * means. It therefore resolves to explicit dates like a custom range does,
+   * rather than to a day count ending today.
+   */
+  if (key === 'lastMonth') {
+    const window = previousMonthWindow();
+    return {
+      key: 'lastMonth',
+      label: `Last month · ${monthLabel(window.from)}`,
+      days: inclusiveDays(window.from, window.to),
+      custom: window,
+    };
+  }
 
   if (key === 'custom') {
     const custom = normalizeWindow(
@@ -115,6 +147,35 @@ export function normalizeWindow(
   if (inclusiveDays(start, cappedEnd) > 1096) return null;
 
   return { from: start, to: cappedEnd };
+}
+
+/** The previous calendar month, first to last day, as `YYYY-MM-DD`. */
+export function previousMonthWindow(): DateWindow {
+  const now = new Date();
+  const first = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1));
+  const last = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 0));
+  return { from: first.toISOString().slice(0, 10), to: last.toISOString().slice(0, 10) };
+}
+
+function monthLabel(iso: string) {
+  return new Date(`${iso}T00:00:00Z`).toLocaleDateString('en-US', {
+    month: 'long',
+    year: 'numeric',
+    timeZone: 'UTC',
+  });
+}
+
+/**
+ * The muted hint beside a preset in the picker. A calendar preset names its
+ * month, because "30d" beside "Last month" would be a lie in 7 months of 12.
+ */
+export function rangeHint(entry: (typeof DASH_RANGES)[number]) {
+  if (!entry.calendar) return entry.short;
+  return new Date(`${previousMonthWindow().from}T00:00:00Z`).toLocaleDateString('en-US', {
+    month: 'short',
+    year: '2-digit',
+    timeZone: 'UTC',
+  });
 }
 
 /** The furthest-back date the picker offers, so the inputs can bound themselves. */
