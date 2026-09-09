@@ -141,17 +141,6 @@ export const NAV_ITEMS: NavItem[] = [
     mode: 'partial',
   },
   {
-    href: '/gmb-reviews',
-    tone: 'orange',
-    label: 'GMB Reviews Automation',
-    icon: 'sparkles',
-    group: 'Analytics',
-    blurb: 'Monitor Google Business Profile reviews and draft replies by rating.',
-    // Gated on Google approving Business Profile API access for the project,
-    // which is an application, not a config flag. The page explains the steps.
-    mode: 'partial',
-  },
-  {
     href: '/google-ads',
     tone: 'yellow',
     label: 'Google Ads Performance',
