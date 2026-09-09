@@ -228,6 +228,11 @@ export type GscPerformance = {
   totals: { clicks: number; impressions: number; ctr: number; position: number };
   /** Top queries by clicks over the window. */
   queries: { query: string; clicks: number; impressions: number; ctr: number; position: number }[];
+  /**
+   * Top pages by clicks over the window — the `page` dimension, so these are
+   * full URLs on the property rather than the GA4 landing-page paths.
+   */
+  pages: { page: string; clicks: number; impressions: number; ctr: number; position: number }[];
 };
 
 /**
@@ -235,8 +240,10 @@ export type GscPerformance = {
  *
  * Separate from `getGscKeywordData` because that function is shaped for the
  * keyword table — it pulls per-query rows and a weekly position history, and it
- * has no daily site totals to give a time-series widget. This is two calls:
- * one `['date']` for the series, one `['query']` for the table.
+ * has no daily site totals to give a time-series widget. This is three calls:
+ * one `['date']` for the series, one `['query']` and one `['page']` for the
+ * tables. Search Console bills nothing per call and they run in parallel, so
+ * the third dimension costs only its own latency.
  *
  * Returns `null` when no Search Console property matches the domain, which the
  * caller reports as "no property for this domain" rather than "not connected" —
@@ -269,9 +276,10 @@ export async function getGscPerformance(
     : `gsc:perf:${siteUrl}:${windowDays}:${limit}`;
 
   return cached(cacheKey, async () => {
-    const [dateRows, queryRows] = await Promise.all([
+    const [dateRows, queryRows, pageRows] = await Promise.all([
       searchAnalytics(siteUrl, { startDate, endDate, dimensions: ['date'], rowLimit: 500 }),
       searchAnalytics(siteUrl, { startDate, endDate, dimensions: ['query'], rowLimit: limit }),
+      searchAnalytics(siteUrl, { startDate, endDate, dimensions: ['page'], rowLimit: limit }),
     ]);
 
     const daily = dateRows
@@ -303,6 +311,13 @@ export async function getGscPerformance(
       },
       queries: queryRows.map((row) => ({
         query: row.keys[0],
+        clicks: row.clicks,
+        impressions: row.impressions,
+        ctr: Number((row.ctr * 100).toFixed(2)),
+        position: Number(row.position.toFixed(1)),
+      })),
+      pages: pageRows.map((row) => ({
+        page: row.keys[0],
         clicks: row.clicks,
         impressions: row.impressions,
         ctr: Number((row.ctr * 100).toFixed(2)),
