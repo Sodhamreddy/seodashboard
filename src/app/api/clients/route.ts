@@ -7,6 +7,7 @@ import {
   updateClientProviders,
 } from '@/lib/clients';
 import { getActiveDomain } from '@/lib/domain';
+import { invalidateCache } from '@/lib/providers/cache';
 
 export const runtime = 'nodejs';
 
@@ -54,6 +55,16 @@ export async function PATCH(request: Request) {
   if ('error' in result) {
     return NextResponse.json({ error: result.error }, { status: 400 });
   }
+
+  /*
+   * Provider reports are cached per domain for up to five minutes, so setting a
+   * client's Ads customer id and reloading kept showing the "no account
+   * configured" empty state that was cached a moment earlier — the id was
+   * saved, the page just was not asked again. The cache is keyed by domain, so
+   * dropping every entry that names this one is enough.
+   */
+  if (touchesIds) invalidateCache(result.domain);
+
   return NextResponse.json({ ok: true, client: result });
 }
 

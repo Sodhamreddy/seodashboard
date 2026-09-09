@@ -63,6 +63,13 @@ const CLIENT_PROVIDER_FIELDS = [
  * carries its own, and a blank field means that panel stays empty for that
  * client rather than borrowing someone else's numbers.
  */
+/** The three editable ids, as a comparable string. */
+function snapshot(client: Partial<Client>) {
+  return CLIENT_PROVIDER_FIELDS.map((field) => (client[field.key] ?? '').toString().trim()).join(
+    '\u0000',
+  );
+}
+
 export function ClientIntegrations({
   clients,
   activeDomain,
@@ -77,6 +84,19 @@ export function ClientIntegrations({
   const [saving, setSaving] = useState<string | null>(null);
   const [saved, setSaved] = useState<string | null>(null);
   const [error, setError] = useState('');
+  /*
+   * What is actually stored for each client, so a typed-but-unsaved id can be
+   * told apart from a saved one.
+   *
+   * Every field here needs its card's Save button pressed, and the only
+   * feedback was the "n of 3 set" badge — which counts the inputs, so typing an
+   * id made the row look configured while nothing had been written. An id
+   * entered and never saved then reads as a broken dashboard rather than an
+   * unfinished form.
+   */
+  const [stored, setStored] = useState(
+    () => new Map(clients.map((client) => [client.id, snapshot(client)])),
+  );
 
   /*
    * The GA4 properties the connected Google account can actually see.
@@ -146,6 +166,9 @@ export function ClientIntegrations({
             current.map((row) => (row.id === data.client!.id ? data.client! : row)),
           );
         }
+        setStored((current) =>
+          new Map(current).set(client.id, snapshot(data.client ?? client)),
+        );
         setSaved(client.id);
       }
     } catch {
@@ -202,6 +225,7 @@ export function ClientIntegrations({
         const configured = CLIENT_PROVIDER_FIELDS.filter(
           (field) => (client[field.key] ?? '').toString().trim() !== '',
         ).length;
+        const dirty = snapshot(client) !== stored.get(client.id);
 
         return (
           <Card key={client.id}>
@@ -217,9 +241,15 @@ export function ClientIntegrations({
                 </p>
                 <p className="mt-0.5 truncate text-2xs text-ink-muted">{client.domain}</p>
               </div>
-              <Badge tone={configured === 0 ? 'warning' : 'good'} icon={configured === 0 ? 'alert' : 'check'}>
-                {configured} of {CLIENT_PROVIDER_FIELDS.length} set
-              </Badge>
+              <div className="flex items-center gap-2">
+                {dirty && <Badge tone="warning">unsaved changes</Badge>}
+                <Badge
+                  tone={configured === 0 ? 'warning' : 'good'}
+                  icon={configured === 0 ? 'alert' : 'check'}
+                >
+                  {configured} of {CLIENT_PROVIDER_FIELDS.length} set
+                </Badge>
+              </div>
             </div>
 
             <div className="grid gap-3 lg:grid-cols-3">
@@ -282,23 +312,29 @@ export function ClientIntegrations({
             <div className="mt-3 flex items-center gap-3">
               <Button
                 size="sm"
-                variant="secondary"
-                icon={saved === client.id ? 'check' : 'copy'}
+                variant={dirty ? 'primary' : 'secondary'}
+                icon={saved === client.id && !dirty ? 'check' : 'copy'}
                 loading={saving === client.id}
                 onClick={() => save(client)}
               >
-                {saved === client.id ? 'Saved' : 'Save'}
+                {saved === client.id && !dirty ? 'Saved' : 'Save'}
               </Button>
               <span
                 className={cx(
                   'text-2xs',
-                  saved === client.id ? 'text-status-good' : 'text-ink-muted',
+                  dirty
+                    ? 'font-medium text-status-warning'
+                    : saved === client.id
+                      ? 'text-status-good'
+                      : 'text-ink-muted',
                 )}
               >
-                {saved === client.id ? (
+                {dirty ? (
+                  'Not stored yet — press Save to apply these ids to this client.'
+                ) : saved === client.id ? (
                   <span className="inline-flex items-center gap-1">
                     <Icon name="check" size={11} />
-                    Stored — reload the dashboard to see it apply
+                    Stored — the panels for this client pick it up on the next load
                   </span>
                 ) : (
                   'Leave a field blank to leave that provider unconfigured for this client.'
