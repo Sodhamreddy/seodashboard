@@ -12,7 +12,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   return (
     <div className="flex min-h-screen">
       <aside className="sticky top-0 hidden h-screen w-[266px] shrink-0 border-r border-hairline bg-surface lg:block">
-        <Sidebar username={session?.u ?? 'user'} />
+        <Sidebar username={session?.u ?? 'user'} domain={domain} />
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">

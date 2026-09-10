@@ -6,13 +6,17 @@ import { usePathname } from 'next/navigation';
 import { Icon } from '@/components/ui/Icon';
 import { cx } from '@/components/ui/primitives';
 import { NAV_GROUPS, NAV_ITEMS } from '@/lib/nav';
+import { DomainSwitcher } from './DomainSwitcher';
 
 export function Sidebar({
   onNavigate,
   username = 'user',
+  domain,
 }: {
   onNavigate?: () => void;
   username?: string;
+  /** The active client, shown in the switcher pinned under the brand. */
+  domain?: string;
 }) {
   const pathname = usePathname();
   const settingsActive = pathname === '/settings';
@@ -32,6 +36,14 @@ export function Sidebar({
           <span className="block text-2xs text-ink-muted">Premium dashboard</span>
         </span>
       </Link>
+
+      {/*
+       * The active client sits directly under the brand, where a workspace
+       * switcher belongs: it scopes everything in the list below it, so it
+       * reads as the parent of the nav rather than one control among the
+       * theme buttons in the top bar.
+       */}
+      {domain && <DomainSwitcher domain={domain} variant="sidebar" onNavigate={onNavigate} />}
 
       <div className="flex-1 space-y-3">
         {NAV_GROUPS.map((group) => {
