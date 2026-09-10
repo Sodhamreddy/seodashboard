@@ -44,6 +44,17 @@ export const NAV_ITEMS: NavItem[] = [
     mode: 'partial',
   },
   {
+    href: '/automations',
+    tone: 'aqua',
+    label: 'Automations',
+    icon: 'layers',
+    group: 'Operations',
+    blurb: 'Every agent, workflow and tool the team runs, with status and last run.',
+    // The catalogue is real and editable; the last-run column is only as live
+    // as the runners that report into it.
+    mode: 'partial',
+  },
+  {
     href: '/seo-score',
     tone: 'violet',
     label: 'SEO Score Checker',
@@ -166,6 +177,7 @@ export const NAV_ITEMS: NavItem[] = [
 
 export const NAV_GROUPS = [
   'Overview',
+  'Operations',
   'Reporting',
   'On-page tools',
   'Off-page',

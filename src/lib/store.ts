@@ -37,6 +37,12 @@ export const ALERT_RULES_PATH = join('alerts', 'rules.json');
 
 export const CLIENTS_PATH = join('clients.json');
 
+/** The automation registry — the catalogue the team maintains by hand. */
+export const AUTOMATIONS_PATH = join('automations', 'registry.json');
+
+/** Runs reported by whatever executes those automations. */
+export const AUTOMATION_RUNS_PATH = join('automations', 'runs.json');
+
 /** GMB reply templates, per domain — the review automation's rule set. */
 export function gmbRulesPath(domain: string) {
   return join('gmb', `${safeName(domain)}.json`);
