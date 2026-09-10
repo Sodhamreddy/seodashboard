@@ -6,6 +6,7 @@ import { Icon, type IconName } from '@/components/ui/Icon';
 import { Badge, Button, cx } from '@/components/ui/primitives';
 import type { Client } from '@/lib/clients';
 import { MODE_LABEL, navItemFor } from '@/lib/nav';
+import { ModuleMenu } from './ModuleMenu';
 import { Sidebar } from './Sidebar';
 
 /** Shown once the roster is long enough that scanning beats scrolling. */
@@ -446,6 +447,7 @@ export function Topbar({ domain, username }: { domain: string; username: string 
           </div>
 
           <div className="flex shrink-0 items-center gap-2">
+            <ModuleMenu />
             <DomainSwitcher domain={domain} />
             <ThemeToggle />
             <form action="/api/auth/logout" method="post">

@@ -44,6 +44,16 @@ export const NAV_ITEMS: NavItem[] = [
     mode: 'partial',
   },
   {
+    href: '/queue',
+    tone: 'rose',
+    label: 'Work queue',
+    icon: 'target',
+    group: 'Overview',
+    blurb: 'Everything waiting on a person — budgets, failed runs, missing setup.',
+    // Derived entirely from state the app already holds.
+    mode: 'real',
+  },
+  {
     href: '/automations',
     tone: 'aqua',
     label: 'Automations',
@@ -172,6 +182,68 @@ export const NAV_ITEMS: NavItem[] = [
     blurb: 'Threshold rules, pacing projections and alert delivery.',
     // Same gate as Google Ads Performance — this reads the same report.
     mode: 'partial',
+  },
+];
+
+/**
+ * How the tools group into modules for the mega-menu.
+ *
+ * Deliberately a different shape from `NAV_GROUPS`, which drives the sidebar:
+ * the sidebar is a list you scan top to bottom in one column, the menu is a
+ * map you read across. Search and technical work is one column here because
+ * that is how it is *thought about*, even though the sidebar splits on-page
+ * from off-page for scanning.
+ */
+export const MODULE_COLUMNS: { title: string; items: NavItem[] }[] = [
+  {
+    title: 'Search & technical',
+    items: NAV_ITEMS.filter((item) => ['On-page tools', 'Off-page'].includes(item.group)),
+  },
+  {
+    title: 'Analytics & paid',
+    items: NAV_ITEMS.filter((item) => ['Analytics', 'Paid media'].includes(item.group)),
+  },
+  {
+    title: 'Reporting & operations',
+    items: NAV_ITEMS.filter((item) =>
+      ['Overview', 'Reporting', 'Operations'].includes(item.group),
+    ),
+  },
+];
+
+/**
+ * The v2 modules, shown in the menu as planned.
+ *
+ * Kept here rather than in the automation registry because these are product
+ * surfaces, not automations with run logs — and because a roadmap visible from
+ * inside the product is the cheapest way to stop "is that built yet?" being a
+ * question someone has to ask. Each becomes a real `NAV_ITEMS` entry when it
+ * ships, and its row here is deleted.
+ */
+export const PLANNED_MODULES: {
+  title: string;
+  state: string;
+  items: { label: string; blurb: string }[];
+}[] = [
+  {
+    title: 'Content',
+    state: 'planned',
+    items: [
+      { label: 'Article studio', blurb: 'Brief to draft, scored before it publishes.' },
+      { label: 'Brand voice', blurb: 'Learned from the client’s own pages.' },
+      { label: 'Calendar', blurb: '90 days of planned topics per client.' },
+      { label: 'Publishing', blurb: 'WordPress first, then Webflow and Ghost.' },
+    ],
+  },
+  {
+    title: 'Local & social',
+    state: 'gated',
+    items: [
+      { label: 'Reviews', blurb: 'Written — waiting on Business Profile API access.' },
+      { label: 'Profile posts', blurb: 'Scheduled posts to Google Business Profile.' },
+      { label: 'Grid rank', blurb: 'Maps and local pack position by location.' },
+      { label: 'Social scheduler', blurb: 'One queue across four networks.' },
+    ],
   },
 ];
 
