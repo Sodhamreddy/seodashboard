@@ -14,10 +14,19 @@ import type { ReferringDomain } from '@/lib/providers/backlinks';
  * an empty column implies it was checked and found missing.
  */
 
-type FilterKey = 'all' | 'high' | 'medium' | 'low' | 'flagged';
+type FilterKey = 'all' | 'new' | 'lost' | 'high' | 'medium' | 'low' | 'flagged';
 
-const FILTERS: { key: FilterKey; label: string }[] = [
-  { key: 'all', label: 'All' },
+/*
+ * New and lost lead, because they are the two the operator acts on: one is an
+ * outreach win to record, the other a link to chase. They only appear once a
+ * second snapshot exists to compare against.
+ */
+const MOVEMENT_FILTERS: { key: FilterKey; label: string }[] = [
+  { key: 'new', label: 'New' },
+  { key: 'lost', label: 'Lost' },
+];
+
+const QUALITY_FILTERS: { key: FilterKey; label: string }[] = [
   { key: 'high', label: 'High' },
   { key: 'medium', label: 'Medium' },
   { key: 'low', label: 'Low' },
@@ -30,6 +39,12 @@ const RATING_TONE: Record<string, string> = {
   Medium: 'var(--seq-400)',
   Low: 'var(--seq-250)',
 };
+
+const STATUS_TONE = {
+  new: 'good',
+  live: 'neutral',
+  lost: 'critical',
+} as const;
 
 const COLUMNS: Column<ReferringDomain>[] = [
   {
@@ -49,10 +64,32 @@ const COLUMNS: Column<ReferringDomain>[] = [
     sortValue: (row) => row.sourceDomain,
   },
   {
+    key: 'status',
+    header: 'Status',
+    render: (row) =>
+      row.status ? (
+        <Badge tone={STATUS_TONE[row.status]} icon={row.status === 'lost' ? 'alert' : null}>
+          {row.status}
+        </Badge>
+      ) : (
+        <span className="text-2xs text-ink-muted" title="Needs a second snapshot to compare">
+          —
+        </span>
+      ),
+    sortValue: (row) => ({ lost: 3, new: 2, live: 1 })[row.status ?? 'live'] ?? 0,
+  },
+  {
     key: 'links',
     header: 'Links',
     align: 'right',
-    render: (row) => number(row.links),
+    render: (row) =>
+      row.status === 'lost' ? (
+        <span className="text-ink-muted" title={`Last seen ${row.lastSeen?.slice(0, 10) ?? 'earlier'}`}>
+          gone
+        </span>
+      ) : (
+        number(row.links)
+      ),
     sortValue: (row) => row.links,
   },
   {
@@ -109,6 +146,8 @@ export function ReferringDomainsTable({ rows }: { rows: ReferringDomain[] }) {
   const counts = useMemo(
     () => ({
       all: rows.length,
+      new: rows.filter((row) => row.status === 'new').length,
+      lost: rows.filter((row) => row.status === 'lost').length,
       high: rows.filter((row) => row.rating === 'High').length,
       medium: rows.filter((row) => row.rating === 'Medium').length,
       low: rows.filter((row) => row.rating === 'Low').length,
@@ -117,9 +156,18 @@ export function ReferringDomainsTable({ rows }: { rows: ReferringDomain[] }) {
     [rows],
   );
 
+  // Movement chips are hidden entirely until there is history behind them —
+  // a "New 0" chip on day one would report an absence of data as an absence
+  // of new links.
+  const hasMovement = rows.some((row) => row.status);
+  const filters = hasMovement
+    ? [{ key: 'all' as FilterKey, label: 'All' }, ...MOVEMENT_FILTERS, ...QUALITY_FILTERS]
+    : [{ key: 'all' as FilterKey, label: 'All' }, ...QUALITY_FILTERS];
+
   const filtered = useMemo(() => {
     const byFilter = rows.filter((row) => {
       if (filter === 'flagged') return row.toxic || row.suspicious;
+      if (filter === 'new' || filter === 'lost') return row.status === filter;
       if (filter === 'all') return true;
       return row.rating.toLowerCase() === filter;
     });
@@ -136,7 +184,7 @@ export function ReferringDomainsTable({ rows }: { rows: ReferringDomain[] }) {
           subtitle="Measured by the Crawly index. Anchor text, rel and first-seen dates are not part of this source."
           action={
             <div className="flex flex-wrap gap-1">
-              {FILTERS.map((option) => (
+              {filters.map((option) => (
                 <button
                   key={option.key}
                   type="button"
@@ -167,7 +215,13 @@ export function ReferringDomainsTable({ rows }: { rows: ReferringDomain[] }) {
         columns={COLUMNS}
         rows={filtered}
         rowKey={(row) => row.sourceDomain}
-        initialSort="links"
+        /*
+         * With history, status leads: sorting by link count buried every lost
+         * domain on the last page, because a lost domain has none. Without
+         * history every row would tie at "live", so link count stays the
+         * default there.
+         */
+        initialSort={hasMovement ? 'status' : 'links'}
         emptyMessage="No referring domains match this filter."
         caption="Referring domains with link count, quality rating, harmonic rank and risk flags"
       />

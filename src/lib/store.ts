@@ -37,6 +37,16 @@ export const ALERT_RULES_PATH = join('alerts', 'rules.json');
 
 export const CLIENTS_PATH = join('clients.json');
 
+/**
+ * Daily backlink profile snapshots, per domain.
+ *
+ * The live index has no history of its own, so new / lost / live counts and
+ * the growth series are earned by keeping what it said yesterday.
+ */
+export function backlinkSnapshotPath(domain: string) {
+  return join('backlinks', `${safeName(domain)}.json`);
+}
+
 /** The automation registry — the catalogue the team maintains by hand. */
 export const AUTOMATIONS_PATH = join('automations', 'registry.json');
 

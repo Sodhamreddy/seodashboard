@@ -1,4 +1,10 @@
 import { backlinkProviderStatus, type ProviderStatus } from '../env';
+import {
+  diffBacklinkHistory,
+  recordBacklinkSnapshot,
+  type HistoryDiff,
+  type LostDomain,
+} from './backlinkHistory';
 import { withTtlCache } from './cache';
 import { crawlyConfigured, getCrawlyProfile } from './crawly';
 import { chance, floatBetween, intBetween, isoDaysAgo, isoMonthsAgo, makeRandom, pick, walk } from './seed';
@@ -37,6 +43,15 @@ export type ReferringDomain = {
   harmonicRank: number;
   suspicious: boolean;
   toxic: boolean;
+  /**
+   * Against the previous snapshot: 'new' since it, 'live' in both, 'lost'
+   * if it was there and is not now. Absent until a second snapshot exists —
+   * with one point there is nothing to compare against, and calling every
+   * domain "live" on day one would be a guess dressed as a measurement.
+   */
+  status?: 'new' | 'live' | 'lost';
+  /** Set on a lost domain: when it was last seen in the index. */
+  lastSeen?: string;
 };
 
 export type BacklinkReport = {
@@ -68,7 +83,17 @@ export type BacklinkReport = {
     spamScore?: number;
     /** Live index only: the index's own risk wording, e.g. "Very Low". */
     risk?: string;
+    /** Referring domains still present since the previous snapshot. */
+    liveLinks?: number;
   };
+  /**
+   * How much snapshot history backs the deltas above: 0 or 1 means no
+   * comparison is possible yet, so the page says it is collecting rather than
+   * drawing a flat line.
+   */
+  historyPoints?: number;
+  /** When the comparison baseline was captured. */
+  comparedWith?: string;
   /** Referring-domain growth — one series, trend over time. */
   trend: { date: string; referringDomains: number; backlinks: number }[];
   /** Gained above the baseline, lost below it — diverging by month. */
@@ -118,12 +143,32 @@ const RATING_ORDER = ['High', 'Medium', 'Low'];
  * invented trend. `averageDomainAuthority` carries Crawly's own authority
  * score, which is not Moz DA; the UI labels it accordingly.
  */
-function mapCrawlyReport(
+async function mapCrawlyReport(
   domain: string,
   rangeDays: number,
   profile: NonNullable<Awaited<ReturnType<typeof getCrawlyProfile>>>,
   provider: ProviderStatus,
-): BacklinkReport {
+): Promise<BacklinkReport> {
+  const capturedAt = new Date().toISOString();
+
+  /*
+   * Keep today's profile, then diff it against yesterday's. This is the only
+   * source of new / lost / live in this mode — the index itself has none —
+   * and it costs no extra call, because the profile was already fetched.
+   */
+  const history = await recordBacklinkSnapshot(domain, {
+    at: capturedAt,
+    referringDomains: profile.referringDomains,
+    totalLinks: profile.totalLinks,
+    domains: profile.rows.map((row) => ({
+      d: row.source_domain,
+      r: row.domain_rating,
+      t: row.is_toxic || row.is_suspicious,
+    })),
+  });
+  const diff: HistoryDiff = diffBacklinkHistory(history);
+  const comparable = diff.points > 1;
+
   const rows: ReferringDomain[] = profile.rows.map((row) => ({
     sourceDomain: row.source_domain,
     links: row.link_count,
@@ -131,6 +176,27 @@ function mapCrawlyReport(
     harmonicRank: row.harmonic_rank,
     suspicious: row.is_suspicious,
     toxic: row.is_toxic,
+    status: comparable
+      ? diff.newDomains.has(row.source_domain)
+        ? ('new' as const)
+        : ('live' as const)
+      : undefined,
+  }));
+
+  /*
+   * Lost domains are appended to the same list rather than kept in a separate
+   * panel: "who links to us" and "who stopped" is one question, and a lost row
+   * that is out of sight is a lost link nobody chases.
+   */
+  const lostRows: ReferringDomain[] = diff.lostDomains.map((lost: LostDomain) => ({
+    sourceDomain: lost.d,
+    links: 0,
+    rating: lost.r,
+    harmonicRank: 0,
+    suspicious: lost.t,
+    toxic: lost.t,
+    status: 'lost' as const,
+    lastSeen: lost.lastSeen,
   }));
 
   const ratingCounts = RATING_ORDER.map((rating) => ({
@@ -142,27 +208,34 @@ function mapCrawlyReport(
     domain,
     rangeDays,
     provider,
-    generatedAt: new Date().toISOString(),
+    generatedAt: capturedAt,
     source: 'crawly',
-    referringDomainRows: rows,
+    // Lost domains join the same list; the table decides the order it shows
+    // them in, and sorts on status when there is movement to show.
+    referringDomainRows: [...rows, ...lostRows],
     summary: {
       referringDomains: profile.referringDomains,
-      referringDomainsDelta: 0,
+      referringDomainsDelta: diff.referringDomainsDelta,
       totalBacklinks: profile.totalLinks,
-      totalBacklinksDelta: 0,
-      newLinks: 0,
-      lostLinks: 0,
+      totalBacklinksDelta: diff.totalLinksDelta,
+      newLinks: diff.newDomains.size,
+      lostLinks: diff.lostDomains.length,
       uniqueDomains: rows.length,
       averageDomainAuthority: profile.authorityScore,
       averagePageAuthority: 0,
+      // Not in this index: rel is not reported, so the share stays unknown
+      // rather than being inferred from anything.
       dofollowShare: 0,
       toxicCandidates: rows.filter((row) => row.toxic || row.suspicious).length,
       spamScore: profile.spamScore,
       risk: profile.risk,
+      liveLinks: comparable ? rows.length - diff.newDomains.size : undefined,
     },
-    // No history in this index — the page omits the two time-series panels.
-    trend: [],
-    flow: [],
+    historyPoints: diff.points,
+    comparedWith: diff.comparedWith,
+    // Built from our own snapshots, so both series are real once there are two.
+    trend: diff.trend,
+    flow: diff.flow,
     authorityBuckets: ratingCounts,
     topAnchors: [],
     backlinks: [],
