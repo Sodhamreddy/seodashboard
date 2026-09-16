@@ -3,10 +3,14 @@
 import { BrandMark } from './BrandMark';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useEffect, useState } from 'react';
 import { Icon } from '@/components/ui/Icon';
 import { cx } from '@/components/ui/primitives';
 import { NAV_GROUPS, NAV_ITEMS } from '@/lib/nav';
+import { OPEN_PALETTE_EVENT } from './CommandPalette';
 import { DomainSwitcher } from './DomainSwitcher';
+
+const GROUPS_KEY = 'sitepilot-nav-groups';
 
 export function Sidebar({
   onNavigate,
@@ -20,6 +24,54 @@ export function Sidebar({
 }) {
   const pathname = usePathname();
   const settingsActive = pathname === '/settings';
+  const activeGroup = NAV_ITEMS.find((item) => item.href === pathname)?.group;
+
+  /*
+   * Groups collapse, and only the one you are in opens by default.
+   *
+   * Seventeen tools in one open list is a rail you scroll rather than read,
+   * and scrolling a nav to find a nav item is the failure. Collapsed, the
+   * whole product is seven headings that fit without scrolling, each carrying
+   * its own count; the section you are working in is already open, and the
+   * palette covers the case where you want something from a section you are
+   * not in.
+   *
+   * Derived from the path on first render rather than from storage, so the
+   * server and client agree; the remembered state is applied after mount.
+   */
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(() =>
+    Object.fromEntries(NAV_GROUPS.map((group) => [group, group === (activeGroup ?? 'Overview')])),
+  );
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(GROUPS_KEY);
+      if (stored) setOpenGroups((current) => ({ ...current, ...JSON.parse(stored) }));
+    } catch {
+      /* private mode — the path-derived default stands */
+    }
+  }, []);
+
+  // Navigating into a collapsed section opens it, so the current page is never
+  // hidden behind a chevron.
+  useEffect(() => {
+    if (!activeGroup) return;
+    setOpenGroups((current) =>
+      current[activeGroup] ? current : { ...current, [activeGroup]: true },
+    );
+  }, [activeGroup]);
+
+  function toggleGroup(group: string) {
+    setOpenGroups((current) => {
+      const next = { ...current, [group]: !current[group] };
+      try {
+        localStorage.setItem(GROUPS_KEY, JSON.stringify(next));
+      } catch {
+        /* not persisting is survivable; collapsing must still work */
+      }
+      return next;
+    });
+  }
 
   return (
     <nav aria-label="Tools" className="flex h-full flex-col gap-5 overflow-y-auto px-3 py-4">
@@ -45,24 +97,61 @@ export function Sidebar({
        */}
       {domain && <DomainSwitcher domain={domain} variant="sidebar" onNavigate={onNavigate} />}
 
-      <div className="flex-1 space-y-3">
+      {/* Typing beats scanning once the list is this long. */}
+      <button
+        type="button"
+        onClick={() => window.dispatchEvent(new CustomEvent(OPEN_PALETTE_EVENT))}
+        className="flex h-9 w-full items-center gap-2 rounded-lg border border-hairline bg-surface-sunken px-2.5 text-2xs text-ink-muted transition-colors hover:bg-surface hover:text-ink-secondary"
+      >
+        <Icon name="search" size={13} />
+        Jump to a tool
+        <kbd className="ml-auto rounded border border-hairline bg-surface px-1.5 font-mono text-[0.62rem]">
+          ⌘K
+        </kbd>
+      </button>
+
+      <div className="flex-1 space-y-1.5">
         {NAV_GROUPS.map((group) => {
           const items = NAV_ITEMS.filter((item) => item.group === group);
           if (items.length === 0) return null;
 
+          const expanded = openGroups[group] ?? false;
+          const holdsActive = items.some((item) => item.href === pathname);
+
           return (
-            <div
-              key={group}
-              className="border-t border-hairline pt-3 first:border-0 first:pt-0"
-            >
+            <div key={group} className="border-t border-hairline pt-1.5 first:border-0 first:pt-0">
               {/* Section headings carry full ink, not muted: at this size a
                   muted uppercase label sits under the contrast floor and the
                   groups stop reading as structure. */}
-              <p className="mb-2 flex items-center gap-2 px-2 text-[0.8rem] font-bold uppercase tracking-[0.07em] text-ink">
-                <span aria-hidden="true" className="h-3 w-0.5 shrink-0 rounded-full bg-accent" />
+              <button
+                type="button"
+                onClick={() => toggleGroup(group)}
+                aria-expanded={expanded}
+                className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[0.8rem] font-bold uppercase tracking-[0.07em] text-ink transition-colors hover:bg-surface-sunken"
+              >
+                <span
+                  aria-hidden="true"
+                  className={cx(
+                    'h-3 w-0.5 shrink-0 rounded-full',
+                    holdsActive ? 'bg-accent' : 'bg-hairline',
+                  )}
+                />
                 {group}
-              </p>
-              <ul className="space-y-0.5">
+                <span className="ml-auto flex items-center gap-1.5">
+                  {/* A collapsed group still says how much is inside it. */}
+                  {!expanded && (
+                    <span className="tnum text-2xs font-medium normal-case tracking-normal text-ink-muted">
+                      {items.length}
+                    </span>
+                  )}
+                  <Icon
+                    name={expanded ? 'chevronDown' : 'chevronRight'}
+                    size={12}
+                    className="text-ink-muted"
+                  />
+                </span>
+              </button>
+              <ul className={cx('space-y-0.5 pt-1', !expanded && 'hidden')}>
                 {items.map((item) => {
                   const active = pathname === item.href;
                   // A badged item stays visually raised even when inactive, so a

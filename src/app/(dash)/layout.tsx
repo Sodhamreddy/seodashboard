@@ -1,4 +1,5 @@
 import { cookies } from 'next/headers';
+import { CommandPalette } from '@/components/shell/CommandPalette';
 import { Sidebar } from '@/components/shell/Sidebar';
 import { Topbar } from '@/components/shell/Topbar';
 import { Icon } from '@/components/ui/Icon';
@@ -11,6 +12,8 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
   return (
     <div className="flex min-h-screen">
+      {/* Mounted once for the whole shell; it listens for Ctrl/Cmd+K itself. */}
+      <CommandPalette />
       <aside className="sticky top-0 hidden h-screen w-[266px] shrink-0 border-r border-hairline bg-surface lg:block">
         <Sidebar username={session?.u ?? 'user'} domain={domain} />
       </aside>

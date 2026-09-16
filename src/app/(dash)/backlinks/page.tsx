@@ -24,6 +24,13 @@ export default async function BacklinksPage() {
    */
   const points = report.historyPoints ?? 0;
   const hasHistory = !live || points > 1;
+  /*
+   * A gained/lost chart with nothing gained or lost draws empty axes, which
+   * reads as a broken panel rather than as a stable profile. The trend line is
+   * still worth showing at that point — it carries the level — but this one
+   * waits until there is movement to plot.
+   */
+  const hasMovement = report.flow.some((row) => row.gained > 0 || row.lost > 0);
 
   return (
     <div className="space-y-6">
@@ -157,6 +164,20 @@ export default async function BacklinksPage() {
           />
         </ChartFrame>
 
+        {!hasMovement ? (
+          <Card>
+            <CardHeader
+              icon="refresh"
+              title={live ? 'Domains gained and lost' : 'Links gained and lost'}
+              subtitle="Nothing has moved yet"
+            />
+            <Note tone="good" icon="check">
+              No referring domain has been gained or lost across the{' '}
+              {points > 1 ? `${points} snapshots` : 'snapshots'} captured so far — the profile is
+              holding steady. This chart appears with the first change.
+            </Note>
+          </Card>
+        ) : (
         <ChartFrame
           title={live ? 'Domains gained and lost' : 'Links gained and lost'}
           subtitle="Gained above the baseline, lost below it — net movement is the difference"
@@ -183,6 +204,7 @@ export default async function BacklinksPage() {
             negative={{ key: 'lostNegative', label: 'Lost', color: 'var(--div-neg)' }}
           />
         </ChartFrame>
+        )}
       </section>
       )}
 
