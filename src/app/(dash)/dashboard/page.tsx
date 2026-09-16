@@ -4,6 +4,7 @@ import { BarList } from '@/components/charts/ChartShell';
 import { TrendLine } from '@/components/charts/Charts';
 import { ExportReportButton } from '@/components/panels/ExportReportButton';
 import { Panel } from '@/components/panels/Panel';
+import { OverviewHero } from '@/components/panels/OverviewHero';
 import { ToolLauncher } from '@/components/panels/ToolLauncher';
 import { RangeFilter } from '@/components/shell/RangeFilter';
 import { Delta, Meter, MetricCell, MiniGauge, ScoreGauge, Sparkline } from '@/components/ui/data';
@@ -138,7 +139,18 @@ export default async function OverviewPage({
         </Note>
       )}
 
-      {/* ── On-page tools lead: each is a live action ────────────────── */}
+      {/* ── The account, before the tools ───────────────────────────── */}
+      <OverviewHero
+        health={health}
+        traffic={traffic}
+        keywords={keywords}
+        backlinks={backlinks}
+        ads={ads}
+        accountAlert={accountAlert}
+        windowLabel={reportWindow}
+      />
+
+      {/* ── On-page tools: each is a live action ─────────────────────── */}
       <section>
         <SectionHeading
           title="On-page tools"

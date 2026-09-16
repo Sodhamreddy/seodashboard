@@ -1,5 +1,7 @@
 'use client';
 
+import { SCORE_BANDS, scoreBand } from '@/lib/score-band';
+
 import { useId, useMemo, useState, type ReactNode } from 'react';
 import { Icon, type IconName } from './Icon';
 import { Badge, cx, type Tone } from './primitives';
@@ -173,16 +175,9 @@ export function StatTile({
 
 /* ── Score gauge ───────────────────────────────────────────────────── */
 
-const SCORE_BANDS: { min: number; color: string; label: string; tone: Tone }[] = [
-  { min: 90, color: 'var(--status-good)', label: 'Excellent', tone: 'good' },
-  { min: 75, color: 'var(--seq-400)', label: 'Good', tone: 'accent' },
-  { min: 50, color: 'var(--status-serious)', label: 'Needs work', tone: 'serious' },
-  { min: 0, color: 'var(--status-critical)', label: 'Critical', tone: 'critical' },
-];
-
-export function scoreBand(score: number) {
-  return SCORE_BANDS.find((band) => score >= band.min) ?? SCORE_BANDS[SCORE_BANDS.length - 1];
-}
+// Re-exported for the client components that already import it from here;
+// server components must import from '@/lib/score-band' directly.
+export { scoreBand, SCORE_BANDS };
 
 export function ScoreGauge({
   score,
