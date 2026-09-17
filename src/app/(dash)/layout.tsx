@@ -14,7 +14,8 @@ export default async function DashboardLayout({ children }: { children: React.Re
     <div className="flex min-h-screen">
       {/* Mounted once for the whole shell; it listens for Ctrl/Cmd+K itself. */}
       <CommandPalette />
-      <aside className="sticky top-0 hidden h-screen w-[266px] shrink-0 border-r border-hairline bg-surface lg:block">
+      {/* No width here: the rail sets its own so it can collapse to icons. */}
+      <aside className="sticky top-0 hidden h-screen shrink-0 border-r border-hairline bg-surface lg:block">
         <Sidebar username={session?.u ?? 'user'} />
       </aside>
 

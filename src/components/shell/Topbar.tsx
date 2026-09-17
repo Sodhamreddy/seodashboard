@@ -67,34 +67,28 @@ function ThemeToggle() {
     }
   }
 
+  /*
+   * One button that cycles, not three that sit there.
+   *
+   * Three labelled options took the width of the client switcher to express a
+   * setting nobody changes twice a day, in the corner where the switcher and
+   * the search actually need room. The icon shows the current mode and the
+   * tooltip names the next one, which is the whole affordance a three-state
+   * toggle needs.
+   */
+  const current = THEME_OPTIONS.find((option) => option.value === choice) ?? THEME_OPTIONS[0];
+  const next = THEME_OPTIONS[(THEME_OPTIONS.indexOf(current) + 1) % THEME_OPTIONS.length];
+
   return (
-    <div
-      role="group"
-      aria-label="Colour theme"
-      className="flex rounded-lg border border-hairline p-0.5"
+    <button
+      type="button"
+      onClick={() => select(next.value)}
+      aria-label={`Theme: ${current.label}. Switch to ${next.label}.`}
+      title={`${current.label} theme — click for ${next.label}`}
+      className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-hairline text-ink-secondary transition-colors hover:bg-surface-sunken hover:text-ink"
     >
-      {THEME_OPTIONS.map((option) => {
-        const active = choice === option.value;
-        return (
-          <button
-            key={option.value}
-            type="button"
-            onClick={() => select(option.value)}
-            aria-pressed={active}
-            title={`${option.label} theme`}
-            className={cx(
-              'flex h-8 items-center gap-1.5 rounded-md px-2 text-2xs font-medium transition-colors',
-              active
-                ? 'bg-accent-soft text-accent'
-                : 'text-ink-muted hover:text-ink',
-            )}
-          >
-            <Icon name={option.icon} size={14} />
-            <span className="hidden xl:inline">{option.label}</span>
-          </button>
-        );
-      })}
-    </div>
+      <Icon name={current.icon} size={16} />
+    </button>
   );
 }
 
@@ -177,16 +171,6 @@ export function Topbar({ domain, username }: { domain: string; username: string 
 
             <DomainSwitcher domain={domain} />
             <ThemeToggle />
-            <form action="/api/auth/logout" method="post">
-              <button
-                type="submit"
-                title={`Sign out ${username}`}
-                aria-label={`Sign out ${username}`}
-                className="grid h-9 w-9 place-items-center rounded-lg border border-hairline text-ink-secondary hover:bg-surface-sunken hover:text-ink"
-              >
-                <Icon name="logout" size={16} />
-              </button>
-            </form>
           </div>
         </div>
       </header>
@@ -215,7 +199,7 @@ export function Topbar({ domain, username }: { domain: string; username: string 
             drawerOpen ? 'translate-x-0' : '-translate-x-full',
           )}
         >
-          <Sidebar onNavigate={() => setDrawerOpen(false)} username={username} />
+          <Sidebar onNavigate={() => setDrawerOpen(false)} username={username} collapsible={false} />
         </div>
       </div>
     </>
