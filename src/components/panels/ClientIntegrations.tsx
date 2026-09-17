@@ -99,6 +99,112 @@ export function ClientIntegrations({
   );
 
   /*
+   * Adding a client used to live only in the top-bar switcher, and this panel
+   * — the page actually called "Client integrations" — could only edit rows
+   * that already existed, telling you to go elsewhere to make one. Somebody
+   * setting up a new client is already here, filling in ids; the row they need
+   * should start here too.
+   */
+  const [adding, setAdding] = useState(false);
+  const [newName, setNewName] = useState('');
+  const [newDomain, setNewDomain] = useState('');
+  const [addPending, setAddPending] = useState(false);
+
+  async function addClient(event: React.FormEvent) {
+    event.preventDefault();
+    setAddPending(true);
+    setError('');
+    try {
+      const response = await fetch('/api/clients', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ name: newName, domain: newDomain }),
+      });
+      const data = (await response.json()) as { error?: string; client?: Client };
+      if (!response.ok || !data.client) {
+        setError(data.error ?? 'Could not add the client.');
+        return;
+      }
+
+      const added = data.client;
+      // Re-adding an existing domain is a rename server-side, so replace
+      // rather than append — otherwise the roster grows a duplicate row that
+      // the server does not have.
+      setRows((current) =>
+        current.some((row) => row.id === added.id)
+          ? current.map((row) => (row.id === added.id ? added : row))
+          : [...current, added],
+      );
+      setStored((current) => new Map(current).set(added.id, snapshot(added)));
+      setNewName('');
+      setNewDomain('');
+      setAdding(false);
+    } catch {
+      setError('Network error — the client was not added.');
+    } finally {
+      setAddPending(false);
+    }
+  }
+
+  /** The form and its trigger, shown above the roster and in the empty state. */
+  const addBlock = adding ? (
+    <Card>
+      <form onSubmit={addClient} className="space-y-3">
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className="block">
+            <span className="mb-1 block text-2xs font-medium text-ink-secondary">Client name</span>
+            <Input
+              value={newName}
+              autoFocus
+              placeholder="Assured Home Nursing"
+              onChange={(event) => setNewName(event.target.value)}
+            />
+          </label>
+          <label className="block">
+            <span className="mb-1 block text-2xs font-medium text-ink-secondary">Domain</span>
+            <Input
+              value={newDomain}
+              placeholder="example.com"
+              autoComplete="off"
+              onChange={(event) => setNewDomain(event.target.value)}
+            />
+          </label>
+        </div>
+        <p className="text-2xs leading-relaxed text-ink-muted">
+          The domain is what every panel is scoped to, so it has to match the property in Search
+          Console — no protocol, no trailing slash. Provider ids come next, on the row this creates.
+        </p>
+        <div className="flex items-center gap-2">
+          <Button size="sm" type="submit" icon="plus" loading={addPending}>
+            Add client
+          </Button>
+          <Button
+            size="sm"
+            variant="secondary"
+            type="button"
+            onClick={() => {
+              setAdding(false);
+              setError('');
+            }}
+          >
+            Cancel
+          </Button>
+        </div>
+      </form>
+    </Card>
+  ) : (
+    <div className="flex flex-wrap items-center justify-between gap-2">
+      <p className="text-2xs text-ink-muted">
+        {rows.length} client{rows.length === 1 ? '' : 's'} on the roster · switch between them from
+        the top bar
+      </p>
+      <Button size="sm" variant="secondary" icon="plus" onClick={() => setAdding(true)}>
+        Add client
+      </Button>
+    </div>
+  );
+
+  /*
    * The GA4 properties the connected Google account can actually see.
    *
    * Typing a numeric property id by hand was the wrong design: the account
@@ -180,14 +286,25 @@ export function ClientIntegrations({
 
   if (rows.length === 0) {
     return (
-      <Note tone="neutral" icon="info">
-        No clients saved yet. Add one from the switcher in the top bar.
-      </Note>
+      <div className="space-y-3">
+        <Note tone="neutral" icon="info">
+          No clients saved yet. Add the first one here — or from the switcher in the top bar, which
+          writes to the same roster.
+        </Note>
+        {error && (
+          <Note tone="critical" icon="alert">
+            {error}
+          </Note>
+        )}
+        {addBlock}
+      </div>
     );
   }
 
   return (
     <div className="space-y-3">
+      {addBlock}
+
       {envFallbackActive ? (
         <Note tone="neutral" icon="info">
           <span className="font-semibold">One client saved, so environment defaults still apply.</span>{' '}
