@@ -141,6 +141,16 @@ export const NAV_ITEMS: NavItem[] = [
     mode: 'partial',
   },
   {
+    href: '/ai-overview',
+    tone: 'violet',
+    label: 'AI Overview',
+    icon: 'sparkles',
+    group: 'AI Search',
+    blurb: 'Whether ChatGPT, Gemini and Claude cite this site for its ranking keywords.',
+    // Gemini is wired and grounded; the other two read their keys and wait.
+    mode: 'partial',
+  },
+  {
     href: '/google-ads',
     tone: 'yellow',
     label: 'Google Ads Performance',
@@ -180,6 +190,7 @@ export const GROUP_ICON: Record<string, IconName> = {
   'On-page tools': 'code',
   'Off-page': 'link',
   Analytics: 'chartLine',
+  'AI Search': 'sparkles',
   'Paid media': 'donut',
 };
 
@@ -189,6 +200,7 @@ export const NAV_GROUPS = [
   'On-page tools',
   'Off-page',
   'Analytics',
+  'AI Search',
   'Paid media',
 ] as const;
 

@@ -249,7 +249,7 @@ export function Sidebar({
                           // so it takes the heading's weight; a lighter row
                           // between two bold headings reads as subordinate to
                           // them when it is their peer.
-                          !active && !promoted && solo && 'font-semibold text-ink hover:bg-surface-raised',
+                          !active && !promoted && solo && 'font-bold text-ink hover:bg-surface-raised',
                           !active && !promoted && !solo && 'font-medium text-ink hover:bg-surface-raised',
                         )}
                       >
