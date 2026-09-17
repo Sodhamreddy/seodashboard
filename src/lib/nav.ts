@@ -186,25 +186,26 @@ export const NAV_ITEMS: NavItem[] = [
 ];
 
 /**
- * An icon per section.
+ * Icon and colour per section.
  *
- * With the groups collapsed, the rail is seven uppercase words and a count —
- * which says how much is in each section but nothing about what any of them
- * is. The icon is the part that gets recognised before the label is read, and
- * it is the only thing carrying meaning while a group is shut.
+ * Collapsed, the rail was seven uppercase words and a count: enough to say how
+ * much is in each section, nothing to say what it is. The icon is what gets
+ * recognised before the label is read.
  *
- * Each one borrows from the section's own tools rather than being decorative:
- * links for off-page, a code tag for the markup and file generators, a donut
- * for budget share.
+ * The tone comes from the same six-colour set every tool already uses, and is
+ * taken from the dominant tool in each section — so a section's chip in the
+ * rail matches the cards for its tools on the page, and the colour means
+ * "this family of work" in both places rather than being decoration applied
+ * twice from different palettes.
  */
-export const GROUP_ICON: Record<string, IconName> = {
-  Overview: 'home',
-  Operations: 'refresh',
-  Reporting: 'doc',
-  'On-page tools': 'code',
-  'Off-page': 'link',
-  Analytics: 'chartLine',
-  'Paid media': 'donut',
+export const GROUP_META: Record<string, { icon: IconName; tone: ToolTone }> = {
+  Overview: { icon: 'home', tone: 'violet' },
+  Operations: { icon: 'refresh', tone: 'aqua' },
+  Reporting: { icon: 'doc', tone: 'rose' },
+  'On-page tools': { icon: 'code', tone: 'blue' },
+  'Off-page': { icon: 'link', tone: 'orange' },
+  Analytics: { icon: 'chartLine', tone: 'aqua' },
+  'Paid media': { icon: 'donut', tone: 'yellow' },
 };
 
 export const NAV_GROUPS = [

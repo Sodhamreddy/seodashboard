@@ -6,7 +6,7 @@ import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { Icon } from '@/components/ui/Icon';
 import { cx } from '@/components/ui/primitives';
-import { GROUP_ICON, NAV_GROUPS, NAV_ITEMS } from '@/lib/nav';
+import { GROUP_META, NAV_GROUPS, NAV_ITEMS } from '@/lib/nav';
 
 const GROUPS_KEY = 'sitepilot-nav-groups';
 const COLLAPSED_KEY = 'sitepilot-nav-collapsed';
@@ -161,9 +161,12 @@ export function Sidebar({
                 <p
                   aria-hidden="true"
                   title={group}
-                  className="mb-1 grid h-5 place-items-center text-ink-muted"
+                  className={cx(
+                    'mx-auto mb-1.5 grid h-5 w-5 place-items-center rounded-md',
+                    `tile tile-${GROUP_META[group]?.tone ?? 'blue'}`,
+                  )}
                 >
-                  <Icon name={GROUP_ICON[group] ?? 'layers'} size={12} />
+                  <Icon name={GROUP_META[group]?.icon ?? 'layers'} size={11} />
                 </p>
               )}
 
@@ -177,16 +180,19 @@ export function Sidebar({
                   aria-expanded={expanded}
                   className="group/group flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[0.8rem] font-bold uppercase tracking-[0.07em] text-ink transition-colors hover:bg-surface-sunken"
                 >
+                  {/* The section's own colour, from the same set its tools
+                      use on the page. A ring rather than a colour swap marks
+                      the section you are in, so the identity colour stays
+                      constant and only the emphasis moves. */}
                   <span
                     aria-hidden="true"
                     className={cx(
-                      'grid h-6 w-6 shrink-0 place-items-center rounded-md transition-colors',
-                      holdsActive
-                        ? 'bg-accent text-white'
-                        : 'bg-surface-sunken text-ink-secondary group-hover/group:text-ink',
+                      'grid h-[26px] w-[26px] shrink-0 place-items-center',
+                      `tile tile-${GROUP_META[group]?.tone ?? 'blue'}`,
+                      holdsActive && 'ring-2 ring-accent ring-offset-1 ring-offset-surface',
                     )}
                   >
-                    <Icon name={GROUP_ICON[group] ?? 'layers'} size={13} />
+                    <Icon name={GROUP_META[group]?.icon ?? 'layers'} size={14} />
                   </span>
                   {group}
                   <span className="ml-auto flex items-center gap-1.5">
@@ -222,14 +228,28 @@ export function Sidebar({
                         className={cx(
                           'group relative flex items-center rounded-lg transition-colors',
                           mini
-                            ? 'h-10 w-10 justify-center'
-                            : 'gap-2.5 px-2 py-2 text-[0.85rem]',
+                            ? 'h-11 w-11 justify-center'
+                            : 'gap-2.5 px-2 py-1.5 text-[0.85rem]',
                           active && 'nav-active font-semibold',
                           !active && promoted && 'bg-accent-soft font-semibold text-accent',
                           !active && !promoted && 'font-medium text-ink hover:bg-surface-raised',
                         )}
                       >
-                        <Icon name={item.icon} size={mini ? 17 : 16} className="shrink-0" />
+                        <span
+                          aria-hidden="true"
+                          className={cx(
+                            'grid shrink-0 place-items-center',
+                            mini ? 'h-[30px] w-[30px]' : 'h-[26px] w-[26px]',
+                            // `.nav-active` is an accent gradient with white
+                            // text; a second gradient inside it reads as a
+                            // clash, so the chip goes translucent there.
+                            active
+                              ? 'rounded-[12px] bg-white/20 text-white'
+                              : `tile tile-${item.tone}`,
+                          )}
+                        >
+                          <Icon name={item.icon} size={mini ? 16 : 14} />
+                        </span>
                         {!mini && <span className="truncate">{item.label}</span>}
 
                         {item.badge && !mini && (
