@@ -185,6 +185,28 @@ export const NAV_ITEMS: NavItem[] = [
   },
 ];
 
+/**
+ * An icon per section.
+ *
+ * With the groups collapsed, the rail is seven uppercase words and a count —
+ * which says how much is in each section but nothing about what any of them
+ * is. The icon is the part that gets recognised before the label is read, and
+ * it is the only thing carrying meaning while a group is shut.
+ *
+ * Each one borrows from the section's own tools rather than being decorative:
+ * links for off-page, a code tag for the markup and file generators, a donut
+ * for budget share.
+ */
+export const GROUP_ICON: Record<string, IconName> = {
+  Overview: 'home',
+  Operations: 'refresh',
+  Reporting: 'doc',
+  'On-page tools': 'code',
+  'Off-page': 'link',
+  Analytics: 'chartLine',
+  'Paid media': 'donut',
+};
+
 export const NAV_GROUPS = [
   'Overview',
   'Operations',

@@ -6,7 +6,7 @@ import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { Icon } from '@/components/ui/Icon';
 import { cx } from '@/components/ui/primitives';
-import { NAV_GROUPS, NAV_ITEMS } from '@/lib/nav';
+import { GROUP_ICON, NAV_GROUPS, NAV_ITEMS } from '@/lib/nav';
 
 const GROUPS_KEY = 'sitepilot-nav-groups';
 const COLLAPSED_KEY = 'sitepilot-nav-collapsed';
@@ -157,6 +157,16 @@ export function Sidebar({
                 mini ? 'pt-2 first:pt-0' : 'pt-1.5 first:pt-0',
               )}
             >
+              {mini && (
+                <p
+                  aria-hidden="true"
+                  title={group}
+                  className="mb-1 grid h-5 place-items-center text-ink-muted"
+                >
+                  <Icon name={GROUP_ICON[group] ?? 'layers'} size={12} />
+                </p>
+              )}
+
               {!mini && (
                 /* Section headings carry full ink, not muted: at this size a
                    muted uppercase label sits under the contrast floor and the
@@ -165,15 +175,19 @@ export function Sidebar({
                   type="button"
                   onClick={() => toggleGroup(group)}
                   aria-expanded={expanded}
-                  className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[0.8rem] font-bold uppercase tracking-[0.07em] text-ink transition-colors hover:bg-surface-sunken"
+                  className="group/group flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[0.8rem] font-bold uppercase tracking-[0.07em] text-ink transition-colors hover:bg-surface-sunken"
                 >
                   <span
                     aria-hidden="true"
                     className={cx(
-                      'h-3 w-0.5 shrink-0 rounded-full',
-                      holdsActive ? 'bg-accent' : 'bg-hairline',
+                      'grid h-6 w-6 shrink-0 place-items-center rounded-md transition-colors',
+                      holdsActive
+                        ? 'bg-accent text-white'
+                        : 'bg-surface-sunken text-ink-secondary group-hover/group:text-ink',
                     )}
-                  />
+                  >
+                    <Icon name={GROUP_ICON[group] ?? 'layers'} size={13} />
+                  </span>
                   {group}
                   <span className="ml-auto flex items-center gap-1.5">
                     {/* A collapsed group still says how much is inside it. */}
