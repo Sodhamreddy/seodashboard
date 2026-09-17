@@ -7,6 +7,7 @@ import { Badge, cx } from '@/components/ui/primitives';
 import { MODE_LABEL, navItemFor } from '@/lib/nav';
 import { DomainSwitcher } from './DomainSwitcher';
 import { Sidebar } from './Sidebar';
+import { TopNav } from './TopNav';
 
 type ThemeChoice = 'light' | 'dark' | 'system';
 
@@ -152,6 +153,10 @@ export function Topbar({ domain, username }: { domain: string; username: string 
             </div>
             {item && <p className="mt-0.5 truncate text-xs text-ink-secondary">{item.blurb}</p>}
           </div>
+
+          {/* Every section, along the top. Hidden below xl, where the row
+              cannot hold it and the rail is the navigation. */}
+          <TopNav />
 
           <div className="flex shrink-0 items-center gap-2">
             {/* The switcher lives at the top of the sidebar now. Below `lg`
