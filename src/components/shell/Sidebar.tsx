@@ -245,7 +245,12 @@ export function Sidebar({
                             : 'gap-2.5 px-2 py-1.5 text-[0.85rem]',
                           active && 'nav-active font-semibold',
                           !active && promoted && 'bg-accent-soft font-semibold text-accent',
-                          !active && !promoted && 'font-medium text-ink hover:bg-surface-raised',
+                          // A solo link stands where a section heading would,
+                          // so it takes the heading's weight; a lighter row
+                          // between two bold headings reads as subordinate to
+                          // them when it is their peer.
+                          !active && !promoted && solo && 'font-semibold text-ink hover:bg-surface-raised',
+                          !active && !promoted && !solo && 'font-medium text-ink hover:bg-surface-raised',
                         )}
                       >
                         <span

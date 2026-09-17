@@ -11,6 +11,8 @@ import { clockDuration, compactNumber, number, percent } from '@/lib/format';
 import { formatWindow, resolveRange } from '@/lib/range';
 import { getTrafficReport, halfOverHalfDelta } from '@/lib/providers/traffic';
 import { getGscPerformance } from '@/lib/providers/searchConsole';
+import { AiOverviewPanel } from '@/components/panels/AiOverviewPanel';
+import { engineConfigured, loadAiVisibility } from '@/lib/providers/aiVisibility';
 
 export const metadata: Metadata = { title: 'Website Traffic' };
 export const dynamic = 'force-dynamic';
@@ -32,6 +34,9 @@ export default async function TrafficPage({
    * A Search Console error is caught here so a 403 on one property cannot take
    * down the whole page — it is reported in place instead.
    */
+  // The last stored run only; the check itself is a button, not a render.
+  const aiRuns = await loadAiVisibility(domain);
+
   const [report, search] = await Promise.all([
     getTrafficReport(domain, range.days, range.custom),
     getGscPerformance(domain, { windowDays: range.days, window: range.custom, limit: 25 })
@@ -235,6 +240,19 @@ export default async function TrafficPage({
           </ChartFrame>
         </>
       )}
+
+      {/* ── AI Overview ─────────────────────────────────────────────
+          Sits above the per-page table because it answers a question the
+          rest of the page cannot: search engines are not the only thing
+          reading this site any more. */}
+      <AiOverviewPanel
+        runs={aiRuns}
+        configured={{
+          gemini: engineConfigured('gemini'),
+          chatgpt: engineConfigured('chatgpt'),
+          claude: engineConfigured('claude'),
+        }}
+      />
 
       {/* ── Search performance by page ──────────────────────────────── */}
       <ChartFrame

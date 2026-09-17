@@ -53,6 +53,11 @@ export const AUTOMATIONS_PATH = join('automations', 'registry.json');
 /** Runs reported by whatever executes those automations. */
 export const AUTOMATION_RUNS_PATH = join('automations', 'runs.json');
 
+/** Last AI-visibility run per engine, per domain. */
+export function aiVisibilityPath(domain: string) {
+  return join('ai-visibility', `${safeName(domain)}.json`);
+}
+
 /** GMB reply templates, per domain — the review automation's rule set. */
 export function gmbRulesPath(domain: string) {
   return join('gmb', `${safeName(domain)}.json`);
