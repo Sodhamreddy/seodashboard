@@ -24,13 +24,23 @@ import {
  * grounded model call costing seconds and quota; spending that on every visit
  * to the traffic page would be spending it on nobody's behalf.
  */
+/** Only Gemini has an adapter; the other two read their keys and wait. */
+const WIRED: AiEngine[] = ['gemini'];
+
 export function AiOverviewPanel({
   runs,
   configured,
+  variant = 'full',
 }: {
   runs: AiVisibilityStore;
   /** Which engines have a key on the server. */
   configured: Record<AiEngine, boolean>;
+  /**
+   * 'compact' is the dashboard's version: the three engines and where each
+   * stands, inside the traffic panel. The per-keyword detail stays on the
+   * Website Traffic page rather than being duplicated at half size.
+   */
+  variant?: 'full' | 'compact';
 }) {
   const [store, setStore] = useState(runs);
   const [pending, setPending] = useState<AiEngine | null>(null);
@@ -59,6 +69,93 @@ export function AiOverviewPanel({
   }
 
   const gemini = store.gemini;
+
+  /** What to say about an engine in one line. */
+  function status(engine: AiEngine) {
+    const run = store[engine];
+    if (run) {
+      return {
+        headline: `${run.summary.cited} / ${run.summary.checked} cited`,
+        detail:
+          run.summary.averagePosition !== null
+            ? `avg position ${run.summary.averagePosition} · ${relativeTime(run.at)}`
+            : `no citations · ${relativeTime(run.at)}`,
+        live: true,
+      };
+    }
+    if (!WIRED.includes(engine)) return { headline: '—', detail: 'adapter to come', live: false };
+    if (!configured[engine]) {
+      const entry = AI_ENGINES.find((candidate) => candidate.id === engine);
+      return { headline: '—', detail: `needs ${entry?.env}`, live: false };
+    }
+    return { headline: '—', detail: 'not checked yet', live: false };
+  }
+
+  if (variant === 'compact') {
+    return (
+      <div className="mt-4 border-t border-hairline pt-3.5">
+        <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2">
+          <p className="flex items-center gap-1.5 text-xs font-bold text-ink">
+            <Icon name="sparkles" size={13} className="text-accent" />
+            AI Overview
+          </p>
+          <Button
+            size="sm"
+            variant="secondary"
+            icon="play"
+            loading={pending === 'gemini'}
+            disabled={!configured.gemini}
+            onClick={() => void check('gemini')}
+          >
+            {gemini ? 'Re-check' : 'Check'}
+          </Button>
+        </div>
+
+        {error && (
+          <p className="mb-2 text-2xs text-status-critical">{error}</p>
+        )}
+
+        <div className="grid gap-2 sm:grid-cols-3">
+          {AI_ENGINES.map((engine) => {
+            const state = status(engine.id);
+            return (
+              <div
+                key={engine.id}
+                className="rounded-lg border border-hairline px-3 py-2"
+              >
+                <p className="flex items-center gap-1.5 text-2xs font-medium text-ink-secondary">
+                  <span
+                    aria-hidden="true"
+                    className={cx(
+                      'h-1.5 w-1.5 rounded-full',
+                      state.live ? 'bg-status-good' : 'bg-ink-muted',
+                    )}
+                  />
+                  {engine.label}
+                </p>
+                <p
+                  className={cx(
+                    'mt-1 tnum text-base font-semibold leading-none',
+                    state.live ? 'text-ink' : 'text-ink-muted',
+                  )}
+                >
+                  {state.headline}
+                </p>
+                <p className="mt-1 truncate text-2xs text-ink-muted" title={state.detail}>
+                  {state.detail}
+                </p>
+              </div>
+            );
+          })}
+        </div>
+
+        <p className="mt-2 text-2xs text-ink-muted">
+          Whether each engine cites this site for its top ranking keywords. Per-keyword detail is on
+          Website Traffic.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <Card padded={false}>

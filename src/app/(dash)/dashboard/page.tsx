@@ -4,6 +4,7 @@ import { BarList } from '@/components/charts/ChartShell';
 import { TrendLine } from '@/components/charts/Charts';
 import { ExportReportButton } from '@/components/panels/ExportReportButton';
 import { Panel } from '@/components/panels/Panel';
+import { AiOverviewPanel } from '@/components/panels/AiOverviewPanel';
 import { OverviewHero } from '@/components/panels/OverviewHero';
 import { ToolLauncher } from '@/components/panels/ToolLauncher';
 import { RangeFilter } from '@/components/shell/RangeFilter';
@@ -19,6 +20,7 @@ import { evaluateAlerts, loadAlertRules } from '@/lib/providers/alerts';
 import { getBacklinkReport } from '@/lib/providers/backlinks';
 import { getKeywordReport } from '@/lib/providers/keywords';
 import { getTrafficReport, halfOverHalfDelta } from '@/lib/providers/traffic';
+import { engineConfigured, loadAiVisibility } from '@/lib/providers/aiVisibility';
 import { formatWindow, resolveRange } from '@/lib/range';
 import { buildHealth, healthBand } from '@/lib/seo/health';
 
@@ -65,6 +67,9 @@ export default async function OverviewPage({
    * can never be part fiction.
    */
   const health = buildHealth(ads, backlinks, keywords);
+
+  // Last stored run only — the check itself is a button, never a render.
+  const aiRuns = await loadAiVisibility(domain);
 
   // The roster name is what the operator calls this account; the domain alone
   // reads as configuration. Both are shown, name first.
@@ -242,6 +247,19 @@ export default async function OverviewPage({
               </p>
             </>
           )}
+
+          {/* Answer engines belong next to the traffic they are starting to
+              take: the panel above says who arrived from search, this says
+              whether the engines that answer instead of linking cite us. */}
+          <AiOverviewPanel
+            variant="compact"
+            runs={aiRuns}
+            configured={{
+              gemini: engineConfigured('gemini'),
+              chatgpt: engineConfigured('chatgpt'),
+              claude: engineConfigured('claude'),
+            }}
+          />
         </Panel>
       </section>
 

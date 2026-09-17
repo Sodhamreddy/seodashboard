@@ -38,7 +38,7 @@ export function Panel({
         </span>
 
         <div className="min-w-0 flex-1">
-          <h2 className="truncate text-sm font-semibold text-ink">{title}</h2>
+          <h2 className="truncate text-[0.95rem] font-bold tracking-[-0.01em] text-ink">{title}</h2>
           {subtitle && <p className="mt-0.5 truncate text-2xs text-ink-secondary">{subtitle}</p>}
         </div>
 
