@@ -5,9 +5,9 @@ import { useEffect, useRef, useState } from 'react';
 import { Icon, type IconName } from '@/components/ui/Icon';
 import { Badge, cx } from '@/components/ui/primitives';
 import { MODE_LABEL, navItemFor } from '@/lib/nav';
+import { OPEN_PALETTE_EVENT } from './CommandPalette';
 import { DomainSwitcher } from './DomainSwitcher';
 import { Sidebar } from './Sidebar';
-import { TopNav } from './TopNav';
 
 type ThemeChoice = 'light' | 'dark' | 'system';
 
@@ -154,16 +154,28 @@ export function Topbar({ domain, username }: { domain: string; username: string 
             {item && <p className="mt-0.5 truncate text-xs text-ink-secondary">{item.blurb}</p>}
           </div>
 
-          {/* Every section, along the top. Hidden below xl, where the row
-              cannot hold it and the rail is the navigation. */}
-          <TopNav />
-
+          {/*
+           * The header carries what applies to the whole app — which client,
+           * and how to get anywhere — while the rail carries the navigation
+           * itself. Neither is repeated in the other: a control in two places
+           * is two things to keep in sync and one more row of rail to scroll
+           * past.
+           */}
           <div className="flex shrink-0 items-center gap-2">
-            {/* The switcher lives at the top of the sidebar now. Below `lg`
-                that rail is behind a drawer, so the compact chip stays. */}
-            <span className="lg:hidden">
-              <DomainSwitcher domain={domain} />
-            </span>
+            <button
+              type="button"
+              onClick={() => window.dispatchEvent(new CustomEvent(OPEN_PALETTE_EVENT))}
+              aria-label="Jump to a tool"
+              className="flex h-10 items-center gap-2 rounded-xl border border-hairline bg-surface-sunken px-2.5 text-2xs text-ink-muted transition-colors hover:bg-surface hover:text-ink-secondary"
+            >
+              <Icon name="search" size={14} />
+              <span className="hidden md:inline">Jump to a tool</span>
+              <kbd className="ml-1 hidden rounded border border-hairline bg-surface px-1.5 font-mono text-[0.62rem] md:inline">
+                ⌘K
+              </kbd>
+            </button>
+
+            <DomainSwitcher domain={domain} />
             <ThemeToggle />
             <form action="/api/auth/logout" method="post">
               <button
@@ -203,7 +215,7 @@ export function Topbar({ domain, username }: { domain: string; username: string 
             drawerOpen ? 'translate-x-0' : '-translate-x-full',
           )}
         >
-          <Sidebar onNavigate={() => setDrawerOpen(false)} username={username} domain={domain} />
+          <Sidebar onNavigate={() => setDrawerOpen(false)} username={username} />
         </div>
       </div>
     </>

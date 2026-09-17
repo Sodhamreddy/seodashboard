@@ -15,7 +15,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
       {/* Mounted once for the whole shell; it listens for Ctrl/Cmd+K itself. */}
       <CommandPalette />
       <aside className="sticky top-0 hidden h-screen w-[266px] shrink-0 border-r border-hairline bg-surface lg:block">
-        <Sidebar username={session?.u ?? 'user'} domain={domain} />
+        <Sidebar username={session?.u ?? 'user'} />
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">

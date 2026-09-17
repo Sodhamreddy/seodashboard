@@ -7,20 +7,13 @@ import { useEffect, useState } from 'react';
 import { Icon } from '@/components/ui/Icon';
 import { cx } from '@/components/ui/primitives';
 import { NAV_GROUPS, NAV_ITEMS } from '@/lib/nav';
-import { OPEN_PALETTE_EVENT } from './CommandPalette';
-import { DomainSwitcher } from './DomainSwitcher';
+
 
 const GROUPS_KEY = 'sitepilot-nav-groups';
 
-export function Sidebar({
-  onNavigate,
-  username = 'user',
-  domain,
-}: {
+export function Sidebar({ onNavigate, username = 'user' }: {
   onNavigate?: () => void;
   username?: string;
-  /** The active client, shown in the switcher pinned under the brand. */
-  domain?: string;
 }) {
   const pathname = usePathname();
   const settingsActive = pathname === '/settings';
@@ -89,27 +82,9 @@ export function Sidebar({
         </span>
       </Link>
 
-      {/*
-       * The active client sits directly under the brand, where a workspace
-       * switcher belongs: it scopes everything in the list below it, so it
-       * reads as the parent of the nav rather than one control among the
-       * theme buttons in the top bar.
-       */}
-      {domain && <DomainSwitcher domain={domain} variant="sidebar" onNavigate={onNavigate} />}
-
-      {/* Typing beats scanning once the list is this long. */}
-      <button
-        type="button"
-        onClick={() => window.dispatchEvent(new CustomEvent(OPEN_PALETTE_EVENT))}
-        className="flex h-9 w-full items-center gap-2 rounded-lg border border-hairline bg-surface-sunken px-2.5 text-2xs text-ink-muted transition-colors hover:bg-surface hover:text-ink-secondary"
-      >
-        <Icon name="search" size={13} />
-        Jump to a tool
-        <kbd className="ml-auto rounded border border-hairline bg-surface px-1.5 font-mono text-[0.62rem]">
-          ⌘K
-        </kbd>
-      </button>
-
+      {/* The rail is the navigation and nothing else — the client switcher
+          and the search live in the header, where they apply to every page
+          rather than to this list. */}
       <div className="flex-1 space-y-1.5">
         {NAV_GROUPS.map((group) => {
           const items = NAV_ITEMS.filter((item) => item.group === group);
