@@ -6,7 +6,15 @@ import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { Icon } from '@/components/ui/Icon';
 import { cx } from '@/components/ui/primitives';
-import { GROUP_META, NAV_GROUPS, NAV_ITEMS } from '@/lib/nav';
+import { GROUP_ICON, NAV_GROUPS, NAV_ITEMS } from '@/lib/nav';
+
+/*
+ * One chip, one colour, everywhere in the rail — the same accent-on-soft-
+ * accent pairing the Overview icon already had. Uniform chips let the eye
+ * find a row by its glyph and its position instead of decoding six hues,
+ * and they leave the accent free to mean one thing: this is the app.
+ */
+const CHIP = 'grid shrink-0 place-items-center rounded-[10px] bg-accent-soft text-accent';
 
 const GROUPS_KEY = 'sitepilot-nav-groups';
 const COLLAPSED_KEY = 'sitepilot-nav-collapsed';
@@ -158,15 +166,8 @@ export function Sidebar({
               )}
             >
               {mini && (
-                <p
-                  aria-hidden="true"
-                  title={group}
-                  className={cx(
-                    'mx-auto mb-1.5 grid h-5 w-5 place-items-center rounded-md',
-                    `tile tile-${GROUP_META[group]?.tone ?? 'blue'}`,
-                  )}
-                >
-                  <Icon name={GROUP_META[group]?.icon ?? 'layers'} size={11} />
+                <p aria-hidden="true" title={group} className={cx(CHIP, 'mx-auto mb-1.5 h-5 w-5')}>
+                  <Icon name={GROUP_ICON[group] ?? 'layers'} size={11} />
                 </p>
               )}
 
@@ -180,19 +181,18 @@ export function Sidebar({
                   aria-expanded={expanded}
                   className="group/group flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[0.8rem] font-bold uppercase tracking-[0.07em] text-ink transition-colors hover:bg-surface-sunken"
                 >
-                  {/* The section's own colour, from the same set its tools
-                      use on the page. A ring rather than a colour swap marks
-                      the section you are in, so the identity colour stays
-                      constant and only the emphasis moves. */}
+                  {/* The section you are in fills; the rest stay soft. One
+                      colour, two weights — enough to locate yourself without
+                      a second hue. */}
                   <span
                     aria-hidden="true"
                     className={cx(
-                      'grid h-[26px] w-[26px] shrink-0 place-items-center',
-                      `tile tile-${GROUP_META[group]?.tone ?? 'blue'}`,
-                      holdsActive && 'ring-2 ring-accent ring-offset-1 ring-offset-surface',
+                      CHIP,
+                      'h-[26px] w-[26px]',
+                      holdsActive && 'bg-accent text-white',
                     )}
                   >
-                    <Icon name={GROUP_META[group]?.icon ?? 'layers'} size={14} />
+                    <Icon name={GROUP_ICON[group] ?? 'layers'} size={14} />
                   </span>
                   {group}
                   <span className="ml-auto flex items-center gap-1.5">
@@ -238,14 +238,12 @@ export function Sidebar({
                         <span
                           aria-hidden="true"
                           className={cx(
-                            'grid shrink-0 place-items-center',
+                            CHIP,
                             mini ? 'h-[30px] w-[30px]' : 'h-[26px] w-[26px]',
                             // `.nav-active` is an accent gradient with white
-                            // text; a second gradient inside it reads as a
-                            // clash, so the chip goes translucent there.
-                            active
-                              ? 'rounded-[12px] bg-white/20 text-white'
-                              : `tile tile-${item.tone}`,
+                            // text, so the chip on that row goes translucent
+                            // rather than stamping accent on accent.
+                            active && 'bg-white/20 text-white',
                           )}
                         >
                           <Icon name={item.icon} size={mini ? 16 : 14} />

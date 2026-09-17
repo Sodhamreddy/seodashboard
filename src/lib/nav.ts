@@ -186,26 +186,23 @@ export const NAV_ITEMS: NavItem[] = [
 ];
 
 /**
- * Icon and colour per section.
+ * An icon per section.
  *
- * Collapsed, the rail was seven uppercase words and a count: enough to say how
- * much is in each section, nothing to say what it is. The icon is what gets
- * recognised before the label is read.
- *
- * The tone comes from the same six-colour set every tool already uses, and is
- * taken from the dominant tool in each section — so a section's chip in the
- * rail matches the cards for its tools on the page, and the colour means
- * "this family of work" in both places rather than being decoration applied
- * twice from different palettes.
+ * The colour deliberately does not vary. Six tones in a rail of twenty-two
+ * chips turned the navigation into the loudest thing on screen, competing
+ * with the data it exists to get you to; the palette earns its keep on the
+ * tool cards, where a tone identifies one tool among a grid of peers. Here
+ * every chip is the brand accent and the icon alone carries the meaning —
+ * which is the job it was always doing.
  */
-export const GROUP_META: Record<string, { icon: IconName; tone: ToolTone }> = {
-  Overview: { icon: 'home', tone: 'violet' },
-  Operations: { icon: 'refresh', tone: 'aqua' },
-  Reporting: { icon: 'doc', tone: 'rose' },
-  'On-page tools': { icon: 'code', tone: 'blue' },
-  'Off-page': { icon: 'link', tone: 'orange' },
-  Analytics: { icon: 'chartLine', tone: 'aqua' },
-  'Paid media': { icon: 'donut', tone: 'yellow' },
+export const GROUP_ICON: Record<string, IconName> = {
+  Overview: 'home',
+  Operations: 'refresh',
+  Reporting: 'doc',
+  'On-page tools': 'code',
+  'Off-page': 'link',
+  Analytics: 'chartLine',
+  'Paid media': 'donut',
 };
 
 export const NAV_GROUPS = [
