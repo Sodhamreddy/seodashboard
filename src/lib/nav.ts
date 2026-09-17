@@ -44,27 +44,6 @@ export const NAV_ITEMS: NavItem[] = [
     mode: 'partial',
   },
   {
-    href: '/queue',
-    tone: 'rose',
-    label: 'Work queue',
-    icon: 'target',
-    group: 'Overview',
-    blurb: 'Everything waiting on a person — budgets, failed runs, missing setup.',
-    // Derived entirely from state the app already holds.
-    mode: 'real',
-  },
-  {
-    href: '/automations',
-    tone: 'aqua',
-    label: 'Automations',
-    icon: 'layers',
-    group: 'Operations',
-    blurb: 'Every agent, workflow and tool the team runs, with status and last run.',
-    // The catalogue is real and editable; the last-run column is only as live
-    // as the runners that report into it.
-    mode: 'partial',
-  },
-  {
     href: '/seo-score',
     tone: 'violet',
     label: 'SEO Score Checker',
@@ -197,7 +176,6 @@ export const NAV_ITEMS: NavItem[] = [
  */
 export const GROUP_ICON: Record<string, IconName> = {
   Overview: 'home',
-  Operations: 'refresh',
   Reporting: 'doc',
   'On-page tools': 'code',
   'Off-page': 'link',
@@ -207,7 +185,6 @@ export const GROUP_ICON: Record<string, IconName> = {
 
 export const NAV_GROUPS = [
   'Overview',
-  'Operations',
   'Reporting',
   'On-page tools',
   'Off-page',

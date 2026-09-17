@@ -156,6 +156,13 @@ export function Sidebar({
 
           const expanded = openGroups[group] ?? false;
           const holdsActive = items.some((item) => item.href === pathname);
+          /*
+           * A group of one is not a group. Overview, Reporting and Analytics
+           * each wrap a single destination, and a heading you have to expand
+           * to reveal one link costs a click to tell you what the heading
+           * already said. They render as plain top-level links instead.
+           */
+          const solo = items.length === 1;
 
           return (
             <div
@@ -165,13 +172,13 @@ export function Sidebar({
                 mini ? 'pt-2 first:pt-0' : 'pt-1.5 first:pt-0',
               )}
             >
-              {mini && (
+              {mini && !solo && (
                 <p aria-hidden="true" title={group} className={cx(CHIP, 'mx-auto mb-1.5 h-5 w-5')}>
                   <Icon name={GROUP_ICON[group] ?? 'layers'} size={11} />
                 </p>
               )}
 
-              {!mini && (
+              {!mini && !solo && (
                 /* Section headings carry full ink, not muted: at this size a
                    muted uppercase label sits under the contrast floor and the
                    groups stop reading as structure. */
@@ -211,7 +218,13 @@ export function Sidebar({
                 </button>
               )}
 
-              <ul className={cx(mini ? 'space-y-1' : 'space-y-0.5 pt-1', !mini && !expanded && 'hidden')}>
+              <ul
+                className={cx(
+                  mini ? 'space-y-1' : 'space-y-0.5',
+                  !mini && !solo && 'pt-1',
+                  !mini && !solo && !expanded && 'hidden',
+                )}
+              >
                 {items.map((item) => {
                   const active = pathname === item.href;
                   // A badged item stays visually raised even when inactive, so a
