@@ -48,11 +48,24 @@ export type AiKeywordResult = {
   sources: AiSource[];
   /** Set when this one keyword failed; the rest of the run still stands. */
   error?: string;
+  /** For a question run: the service the question belongs to. */
+  topic?: string;
 };
+
+/**
+ * What was asked. 'keywords' are the terms the site already ranks for in
+ * Search Console; 'questions' are buyer questions generated from the business.
+ * They measure different things — whether the engine cites you where you
+ * already win, versus whether it recommends you when someone shops the
+ * category — so they are stored and trended separately.
+ */
+export type AiRunMode = 'keywords' | 'questions';
 
 export type AiVisibilityRun = {
   domain: string;
   engine: AiEngine;
+  /** Absent on runs stored before question tracking existed: those were keyword runs. */
+  mode?: AiRunMode;
   model: string;
   at: string;
   results: AiKeywordResult[];
@@ -65,8 +78,81 @@ export type AiVisibilityRun = {
   };
 };
 
-/** Last run per engine, keyed by engine id. */
-export type AiVisibilityStore = Partial<Record<AiEngine, AiVisibilityRun>>;
+/** One run reduced to its summary — the series behind the trend. */
+export type AiRunPoint = {
+  at: string;
+  engine: AiEngine;
+  mode: AiRunMode;
+  checked: number;
+  cited: number;
+  mentioned: number;
+  averagePosition: number | null;
+};
+
+/**
+ * Latest keyword run per engine at the top level — the shape stored before
+ * question tracking, kept so existing files still read — plus the latest
+ * question run per engine and a capped history of every run's summary.
+ */
+export type AiVisibilityStore = Partial<Record<AiEngine, AiVisibilityRun>> & {
+  questions?: Partial<Record<AiEngine, AiVisibilityRun>>;
+  history?: AiRunPoint[];
+};
+
+/* ── Buyer questions ─────────────────────────────────────────────── */
+
+export type AiQuestion = {
+  id: string;
+  question: string;
+  /** The service it belongs to, so the list and the results group by it. */
+  topic: string;
+  addedAt: string;
+};
+
+/**
+ * The questions tracked for one client, generated from the business itself.
+ *
+ * `business` and `services` are what the model understood the site to be.
+ * They are stored and shown so a wrong reading is caught before a month of
+ * tracking is spent on questions about a business the client does not run.
+ */
+export type AiQuestionSet = {
+  domain: string;
+  business: string;
+  services: string[];
+  /** Where the business operates, when it serves a local area. */
+  location?: string;
+  generatedAt: string;
+  model: string;
+  questions: AiQuestion[];
+};
+
+/** Questions generated per set. A run checks all of them. */
+export const MAX_QUESTIONS = 12;
+
+/** Summaries kept in the history — a year of weekly runs across both modes. */
+export const MAX_HISTORY = 100;
+
+/**
+ * Who else the answers cited, across a whole question run.
+ *
+ * This is the competitor list that matters in answer engines: not who ranks
+ * near you on Google, but whose pages the model reached for when a buyer asked
+ * about your category.
+ */
+export function sourceLeaderboard(run: AiVisibilityRun | undefined, limit = 10) {
+  if (!run) return [];
+  const counts = new Map<string, number>();
+  for (const result of run.results) {
+    for (const source of result.sources) {
+      counts.set(source.domain, (counts.get(source.domain) ?? 0) + 1);
+    }
+  }
+  return [...counts.entries()]
+    .map(([domain, answers]) => ({ domain, answers, share: answers / Math.max(1, run.results.length) }))
+    .sort((a, b) => b.answers - a.answers || a.domain.localeCompare(b.domain))
+    .slice(0, limit);
+}
 
 /*
  * A grounded call is a few seconds and real quota, so a run is deliberately

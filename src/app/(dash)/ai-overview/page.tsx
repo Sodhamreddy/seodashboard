@@ -1,5 +1,7 @@
 import type { Metadata } from 'next';
 import { AiOverviewPanel } from '@/components/panels/AiOverviewPanel';
+import { AiQuestionsPanel } from '@/components/panels/AiQuestionsPanel';
+import { loadQuestions } from '@/lib/providers/aiQuestions';
 import { Note } from '@/components/ui/primitives';
 import { getActiveDomain } from '@/lib/domain';
 import { engineConfigured, loadAiVisibility } from '@/lib/providers/aiVisibility';
@@ -19,9 +21,10 @@ export const dynamic = 'force-dynamic';
  */
 export default async function AiOverviewPage() {
   const domain = getActiveDomain();
-  const [runs, keywords] = await Promise.all([
+  const [runs, keywords, questionSet] = await Promise.all([
     loadAiVisibility(domain),
     getKeywordReport(domain),
+    loadQuestions(domain),
   ]);
 
   const checking = keywords.keywords
@@ -34,13 +37,25 @@ export default async function AiOverviewPage() {
       <header className="min-w-0">
         <h1 className="text-2xl font-semibold leading-tight text-ink">AI Overview</h1>
         <p className="mt-1.5 max-w-3xl text-sm text-ink-secondary">
-          Whether ChatGPT, Gemini and Claude cite{' '}
-          <span className="font-medium text-ink">{domain}</span> when asked the questions it already
-          ranks for on Google. There is no position ten in an answer — a site is cited as a source
-          or it is not — so what is measured is citation, rank among the sources named, and who else
-          the answer used.
+          Whether AI assistants recommend{' '}
+          <span className="font-medium text-ink">{domain}</span>, measured two ways.{' '}
+          <span className="font-medium text-ink">Buyer questions</span> are generated from the
+          business and ask what a customer shopping the category would ask — does the assistant
+          recommend you unprompted? <span className="font-medium text-ink">Ranking keywords</span> are
+          the terms you already rank for on Google — where you win clicks today, are you cited? Every
+          run is kept, so both are tracked over time.
         </p>
       </header>
+
+      <AiQuestionsPanel
+        domain={domain}
+        initialSet={questionSet}
+        initialRun={runs.questions?.gemini}
+        history={runs.history ?? []}
+        configured={engineConfigured('gemini')}
+      />
+
+      <h2 className="pt-2 text-sm font-bold text-ink">Ranking keywords</h2>
 
       {checking.length > 0 ? (
         <Note tone="neutral" icon="search">

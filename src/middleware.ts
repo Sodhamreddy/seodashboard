@@ -17,6 +17,8 @@ const PUBLIC_PATHS = [
   '/api/auth/login',
   '/api/auth/logout',
   '/api/automations/runs',
+  // Same trust boundary: an agent the team runs, gated by the same token.
+  '/api/serp/runs',
 ];
 
 export async function middleware(request: NextRequest) {

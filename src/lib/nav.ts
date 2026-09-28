@@ -129,6 +129,16 @@ export const NAV_ITEMS: NavItem[] = [
     mode: 'partial',
   },
   {
+    href: '/serp',
+    tone: 'blue',
+    label: 'SERP Agent',
+    icon: 'target',
+    group: 'Off-page',
+    blurb: 'Exact Google positions reported by the SERP Agent, with movement between runs.',
+    // Real data, but only as live as the agent pushing it in.
+    mode: 'partial',
+  },
+  {
     href: '/traffic',
     tone: 'blue',
     label: 'Website Traffic',

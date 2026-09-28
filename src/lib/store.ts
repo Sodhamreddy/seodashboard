@@ -53,6 +53,16 @@ export const AUTOMATIONS_PATH = join('automations', 'registry.json');
 /** Runs reported by whatever executes those automations. */
 export const AUTOMATION_RUNS_PATH = join('automations', 'runs.json');
 
+/** SERP Agent snapshots, pushed in by the external agent, per domain. */
+export function serpSnapshotPath(domain: string) {
+  return join('serp', `${safeName(domain)}.json`);
+}
+
+/** Buyer questions generated from each client's business. */
+export function aiQuestionsPath(domain: string) {
+  return join('ai-questions', `${safeName(domain)}.json`);
+}
+
 /** Last AI-visibility run per engine, per domain. */
 export function aiVisibilityPath(domain: string) {
   return join('ai-visibility', `${safeName(domain)}.json`);
