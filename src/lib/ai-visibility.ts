@@ -70,7 +70,10 @@ export type AiVisibilityRun = {
   at: string;
   results: AiKeywordResult[];
   summary: {
+    /** Answers that came back. Failed calls are counted in `failed`, not here. */
     checked: number;
+    /** Calls that errored even after retries. Absent on runs stored before this. */
+    failed?: number;
     cited: number;
     mentioned: number;
     /** Mean position across the keywords where the site was cited. */
@@ -161,3 +164,28 @@ export function sourceLeaderboard(run: AiVisibilityRun | undefined, limit = 10) 
  * until they press it again.
  */
 export const MAX_KEYWORDS = 5;
+
+/* ── Background checks ───────────────────────────────────────────── */
+
+/**
+ * A check in progress.
+ *
+ * On the free Gemini tier a twelve-question run takes two to three minutes of
+ * waiting out rate limits. Holding one HTTP request open that long fails
+ * behind any proxy with a sixty-second read timeout — nginx's default — so a
+ * check runs as a job: the button starts it, the panel polls it.
+ */
+export type AiJob = {
+  id: string;
+  domain: string;
+  engine: AiEngine;
+  mode: AiRunMode;
+  status: 'running' | 'done' | 'error';
+  done: number;
+  total: number;
+  /** What it is doing right now, e.g. waiting out a rate limit. */
+  note?: string;
+  error?: string;
+  run?: AiVisibilityRun;
+  startedAt: string;
+};

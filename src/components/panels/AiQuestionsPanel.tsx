@@ -12,6 +12,7 @@ import {
   type AiRunPoint,
   type AiVisibilityRun,
 } from '@/lib/ai-visibility';
+import { useAiCheck } from './useAiCheck';
 
 /**
  * Buyer questions: what the assistants say when someone shops the category.
@@ -67,40 +68,23 @@ export function AiQuestionsPanel({
     }
   }
 
-  async function check() {
-    setPending('check');
-    setError('');
-    try {
-      const response = await fetch('/api/ai-visibility', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ engine: 'gemini', mode: 'questions' }),
-      });
-      const data = (await response.json()) as { error?: string; run?: AiVisibilityRun };
-      if (!response.ok || !data.run) {
-        setError(data.error ?? 'The check could not be run.');
-        return;
-      }
-      const next = data.run;
-      setRun(next);
-      setPoints((current) => [
-        ...current,
-        {
-          at: next.at,
-          engine: next.engine,
-          mode: 'questions',
-          checked: next.summary.checked,
-          cited: next.summary.cited,
-          mentioned: next.summary.mentioned,
-          averagePosition: next.summary.averagePosition,
-        },
-      ]);
-    } catch {
-      setError('Network error — the check did not run.');
-    } finally {
-      setPending(null);
-    }
-  }
+  // Runs in the background on the server; this follows it to completion.
+  const checker = useAiCheck('questions', (next: AiVisibilityRun) => {
+    setRun(next);
+    setPoints((current) => [
+      ...current,
+      {
+        at: next.at,
+        engine: next.engine,
+        mode: 'questions',
+        checked: next.summary.checked,
+        cited: next.summary.cited,
+        mentioned: next.summary.mentioned,
+        averagePosition: next.summary.averagePosition,
+      },
+    ]);
+  });
+  const busy = pending !== null || checker.running;
 
   async function remove(id: string) {
     const response = await fetch('/api/ai-questions', {
@@ -149,7 +133,7 @@ export function AiQuestionsPanel({
                 variant="secondary"
                 icon="refresh"
                 loading={pending === 'generate'}
-                disabled={!configured || pending !== null}
+                disabled={!configured || busy}
                 onClick={() => void generate()}
               >
                 {set ? 'Regenerate' : 'Generate questions'}
@@ -157,9 +141,9 @@ export function AiQuestionsPanel({
               <Button
                 size="sm"
                 icon="play"
-                loading={pending === 'check'}
-                disabled={!configured || !set?.questions.length || pending !== null}
-                onClick={() => void check()}
+                loading={checker.running}
+                disabled={!configured || !set?.questions.length || busy}
+                onClick={() => void checker.start()}
               >
                 {run ? 'Check again' : 'Check visibility'}
               </Button>
@@ -169,9 +153,23 @@ export function AiQuestionsPanel({
       </div>
 
       <div className="space-y-5 border-t border-hairline p-5">
-        {error && (
+        {checker.running && (
+          <Note tone="neutral" icon="clock">
+            <span className="font-semibold">{checker.status}</span> Each question is a live, grounded
+            answer; on the free Gemini tier the run waits out rate limits, so twelve questions take two
+            to three minutes. You can leave this page — the check keeps running.
+          </Note>
+        )}
+        {(error || checker.error) && (
           <Note tone="critical" icon="alert">
-            {error}
+            {error || checker.error}
+          </Note>
+        )}
+        {run && (run.summary.failed ?? 0) > 0 && !checker.running && (
+          <Note tone="warning" icon="alert">
+            {run.summary.failed} question{run.summary.failed === 1 ? '' : 's'} failed even after
+            retrying and {run.summary.failed === 1 ? 'is' : 'are'} left out of the rates below. Run again
+            to fill {run.summary.failed === 1 ? 'it' : 'them'} in.
           </Note>
         )}
 

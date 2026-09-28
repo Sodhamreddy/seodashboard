@@ -3,7 +3,13 @@ import { MAX_KEYWORDS, type AiEngine, type AiRunMode } from '@/lib/ai-visibility
 import { loadClients } from '@/lib/clients';
 import { getActiveDomain } from '@/lib/domain';
 import { loadQuestions } from '@/lib/providers/aiQuestions';
-import { brandTerms, loadAiVisibility, runAiVisibility } from '@/lib/providers/aiVisibility';
+import { getJob, startJob } from '@/lib/providers/aiJobs';
+import {
+  brandTerms,
+  engineConfigured,
+  loadAiVisibility,
+  runAiVisibility,
+} from '@/lib/providers/aiVisibility';
 import { getKeywordReport } from '@/lib/providers/keywords';
 
 export const runtime = 'nodejs';
@@ -46,12 +52,40 @@ export async function POST(request: Request) {
       .map((row) => ({ text: row.keyword }));
   }
 
-  const result = await runAiVisibility(domain, engine, items, mode, terms);
-  if ('error' in result) return NextResponse.json({ error: result.error }, { status: 400 });
-  return NextResponse.json({ ok: true, run: result });
+  // Fail fast on what can be known now, rather than inside a background job.
+  if (!engineConfigured(engine)) {
+    return NextResponse.json(
+      { error: 'Gemini is not configured. Set GEMINI_API_KEY (or GOOGLE_API_KEY) and restart.' },
+      { status: 400 },
+    );
+  }
+  if (items.length === 0) {
+    return NextResponse.json(
+      {
+        error:
+          mode === 'questions'
+            ? 'No questions to check yet — generate them from the business first.'
+            : 'No ranking keywords to check for this client yet.',
+      },
+      { status: 400 },
+    );
+  }
+
+  const job = startJob(domain, engine, mode, (progress) =>
+    runAiVisibility(domain, engine, items, mode, terms, progress),
+  );
+  return NextResponse.json({ ok: true, job }, { status: 202 });
 }
 
-export async function GET() {
+/** `?job=<id>` polls a running check; with no id, returns the stored runs. */
+export async function GET(request: Request) {
+  const id = new URL(request.url).searchParams.get('job');
+  if (id) {
+    const job = getJob(id);
+    return job
+      ? NextResponse.json({ job })
+      : NextResponse.json({ error: 'No such check — it may have finished over an hour ago.' }, { status: 404 });
+  }
   const domain = getActiveDomain();
   return NextResponse.json({ domain, runs: await loadAiVisibility(domain) });
 }

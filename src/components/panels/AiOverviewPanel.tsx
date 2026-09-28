@@ -10,6 +10,7 @@ import {
   type AiVisibilityRun,
   type AiVisibilityStore,
 } from '@/lib/ai-visibility';
+import { useAiCheck } from './useAiCheck';
 
 /**
  * Whether answer engines cite this site for the keywords it already ranks for.
@@ -43,29 +44,18 @@ export function AiOverviewPanel({
   variant?: 'full' | 'compact';
 }) {
   const [store, setStore] = useState(runs);
-  const [pending, setPending] = useState<AiEngine | null>(null);
-  const [error, setError] = useState('');
+  // The check runs as a background job on the server; this follows it.
+  const checker = useAiCheck('keywords', (run: AiVisibilityRun) =>
+    setStore((current) => ({ ...current, [run.engine]: run })),
+  );
+  const pending: AiEngine | null = checker.running ? 'gemini' : null;
+  // While running, the line that normally carries errors carries progress.
+  const error = checker.error;
+  const progress = checker.running ? checker.status : '';
 
-  async function check(engine: AiEngine) {
-    setPending(engine);
-    setError('');
-    try {
-      const response = await fetch('/api/ai-visibility', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ engine }),
-      });
-      const data = (await response.json()) as { error?: string; run?: AiVisibilityRun };
-      if (!response.ok || !data.run) {
-        setError(data.error ?? 'The check could not be run.');
-        return;
-      }
-      setStore((current) => ({ ...current, [engine]: data.run }));
-    } catch {
-      setError('Network error — the check did not run.');
-    } finally {
-      setPending(null);
-    }
+  function check(engine: AiEngine) {
+    // Only Gemini is wired; the argument keeps the call sites engine-shaped.
+    if (engine === 'gemini') void checker.start();
   }
 
   const gemini = store.gemini;
@@ -111,6 +101,7 @@ export function AiOverviewPanel({
           </Button>
         </div>
 
+        {progress && <p className="mb-2 text-2xs font-medium text-accent">{progress}</p>}
         {error && (
           <p className="mb-2 text-2xs text-status-critical">{error}</p>
         )}
@@ -207,6 +198,12 @@ export function AiOverviewPanel({
       </div>
 
       <div className="p-5">
+        {progress && (
+          <Note tone="neutral" icon="clock">
+            <span className="font-semibold">{progress}</span> Each keyword is a live, grounded
+            answer, and on the free Gemini tier the run waits out rate limits between them.
+          </Note>
+        )}
         {error && (
           <Note tone="critical" icon="alert">
             {error}

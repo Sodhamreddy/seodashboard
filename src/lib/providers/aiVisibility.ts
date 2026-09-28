@@ -38,12 +38,58 @@ export {
 const API_ROOT = 'https://generativelanguage.googleapis.com/v1beta/models';
 
 /*
- * Grounded calls in batches rather than all at once: a question run is twelve
- * prompts, and the free Gemini tier rate-limits well below twelve concurrent
- * requests — firing them together turns a quota ceiling into a run where most
- * answers come back as 429s.
+ * One call at a time. The free Gemini tier allows five requests a minute, so
+ * parallel calls buy nothing but a burst of 429s; sequential calls that wait
+ * out Google's stated retry delay get every answer, and on a paid tier the
+ * same loop simply never waits.
  */
-const CONCURRENCY = 4;
+const MAX_RETRIES = 3;
+
+/** Thrown on a 429, carrying how long Google says to wait. */
+export class GeminiRateLimit extends Error {
+  constructor(
+    message: string,
+    readonly retryAfterMs: number,
+    /**
+     * The day's allowance is spent, not the minute's. Waiting a minute and
+     * retrying cannot help, so these fail at once instead of burning three
+     * minutes per question on retries that were never going to succeed.
+     */
+    readonly daily: boolean,
+  ) {
+    super(message);
+  }
+}
+
+/**
+ * The part of a quota error worth showing: the first sentence, plus which
+ * limit was hit ("…free_tier_requests, limit: 20") when Google names it —
+ * the difference between "try again in a minute" and "try again tomorrow".
+ */
+function quotaReason(message: string) {
+  const first = message.split('. ')[0];
+  const metric = /metric: [^\s,]*?([a-z_]+), limit: (\d+)/i.exec(message);
+  return metric ? `${first} (${metric[1]}, limit ${metric[2]})` : first;
+}
+
+/**
+ * Google states the wait twice — a RetryInfo detail ("53s") and the prose
+ * ("Please retry in 53.7s"). Either will do; a small margin is added so the
+ * retry does not land a hair before the window reopens.
+ */
+function retryDelayMs(body: string) {
+  try {
+    const details = JSON.parse(body)?.error?.details as { retryDelay?: string }[] | undefined;
+    const stated = details?.find((detail) => detail.retryDelay)?.retryDelay;
+    if (stated) return Math.ceil(parseFloat(stated) * 1000) + 1500;
+  } catch {
+    /* fall through to the prose */
+  }
+  const match = /retry in ([\d.]+)s/i.exec(body);
+  return match ? Math.ceil(parseFloat(match[1]) * 1000) + 1500 : 30_000;
+}
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
  * Overridable because model ids move faster than this file does. A wrong id
@@ -54,9 +100,24 @@ export function geminiModel() {
   return process.env.GEMINI_MODEL?.trim() || 'gemini-2.5-flash';
 }
 
-export function engineConfigured(engine: AiEngine) {
+/**
+ * The key for an engine, read at call time.
+ *
+ * Gemini also accepts GOOGLE_API_KEY, the name Google's own Gemini SDKs read —
+ * a key saved under that name is not a misconfiguration worth a "not
+ * configured" banner. GEMINI_API_KEY wins when both are set, so a key scoped
+ * to Gemini can sit beside a broader Google one.
+ */
+export function engineKey(engine: AiEngine) {
   const entry = AI_ENGINES.find((candidate) => candidate.id === engine);
-  return Boolean(entry && process.env[entry.env]?.trim());
+  if (!entry) return '';
+  const primary = process.env[entry.env]?.trim();
+  if (primary) return primary;
+  return engine === 'gemini' ? (process.env.GOOGLE_API_KEY?.trim() ?? '') : '';
+}
+
+export function engineConfigured(engine: AiEngine) {
+  return engineKey(engine).length > 0;
 }
 
 /** Bare registrable host: strips scheme, `www.`, path and trailing dot. */
@@ -132,6 +193,9 @@ export async function askGeminiGrounded(prompt: string, apiKey: string): Promise
     } catch {
       /* not JSON — the raw body is the better message */
     }
+    if (response.status === 429) {
+      throw new GeminiRateLimit(`429: ${quotaReason(message)}`, retryDelayMs(body), /PerDay/i.test(body));
+    }
     throw new Error(`${response.status}: ${message}`);
   }
 
@@ -158,14 +222,26 @@ export async function askGeminiGrounded(prompt: string, apiKey: string): Promise
   return { text, sources };
 }
 
+export type ProgressFn = (update: { done: number; total: number; note?: string }) => void;
+
 async function checkOne(
   item: { text: string; topic?: string },
   domain: string,
   terms: string[],
   apiKey: string,
+  onWait: (ms: number) => void,
 ): Promise<AiKeywordResult> {
   try {
-    const answer = await askGeminiGrounded(item.text, apiKey);
+    let answer: GeminiAnswer | null = null;
+    for (let attempt = 0; answer === null; attempt += 1) {
+      try {
+        answer = await askGeminiGrounded(item.text, apiKey);
+      } catch (error) {
+        if (!(error instanceof GeminiRateLimit) || error.daily || attempt >= MAX_RETRIES) throw error;
+        onWait(error.retryAfterMs);
+        await sleep(Math.min(error.retryAfterMs, 90_000));
+      }
+    }
     const target = bareDomain(domain);
     const index = answer.sources.findIndex(
       (source) => source.domain === target || source.domain.endsWith(`.${target}`),
@@ -191,14 +267,6 @@ async function checkOne(
   }
 }
 
-async function inBatches<T, R>(items: T[], size: number, run: (item: T) => Promise<R>) {
-  const out: R[] = [];
-  for (let index = 0; index < items.length; index += size) {
-    out.push(...(await Promise.all(items.slice(index, index + size).map(run))));
-  }
-  return out;
-}
-
 /** Runs one prompt set against one engine and stores it. */
 export async function runAiVisibility(
   domain: string,
@@ -206,11 +274,12 @@ export async function runAiVisibility(
   items: { text: string; topic?: string }[],
   mode: AiRunMode,
   terms: string[],
+  onProgress?: ProgressFn,
 ): Promise<AiVisibilityRun | { error: string }> {
   const entry = AI_ENGINES.find((candidate) => candidate.id === engine);
   if (!entry) return { error: `Unknown engine "${engine}".` };
 
-  const apiKey = process.env[entry.env]?.trim();
+  const apiKey = engineKey(engine);
   if (!apiKey) {
     return {
       error: `${entry.label} is not configured. Set ${entry.env} in the server environment and restart.`,
@@ -228,11 +297,28 @@ export async function runAiVisibility(
     };
   }
 
-  const results = await inBatches(items, CONCURRENCY, (item) =>
-    checkOne(item, domain, terms, apiKey),
-  );
+  const results: AiKeywordResult[] = [];
+  for (const item of items) {
+    onProgress?.({ done: results.length, total: items.length });
+    results.push(
+      await checkOne(item, domain, terms, apiKey, (ms) =>
+        onProgress?.({
+          done: results.length,
+          total: items.length,
+          note: `Rate limit — resuming in ${Math.ceil(ms / 1000)}s`,
+        }),
+      ),
+    );
+  }
+  onProgress?.({ done: results.length, total: items.length });
 
-  const cited = results.filter((result) => result.cited);
+  /*
+   * Rates are over the answers that came back. A failed call is not "not
+   * mentioned" — counting it as one understated the result: four rate-limited
+   * questions turned 0 of 8 into 0 of 12.
+   */
+  const answered = results.filter((result) => !result.error);
+  const cited = answered.filter((result) => result.cited);
   const run: AiVisibilityRun = {
     domain,
     engine,
@@ -241,9 +327,10 @@ export async function runAiVisibility(
     at: new Date().toISOString(),
     results,
     summary: {
-      checked: results.length,
+      checked: answered.length,
+      failed: results.length - answered.length,
       cited: cited.length,
-      mentioned: results.filter((result) => result.mentioned).length,
+      mentioned: answered.filter((result) => result.mentioned).length,
       averagePosition: cited.length
         ? Number(
             (cited.reduce((sum, result) => sum + (result.position ?? 0), 0) / cited.length).toFixed(1),

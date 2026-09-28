@@ -1,6 +1,6 @@
 import { MAX_QUESTIONS, type AiQuestion, type AiQuestionSet } from '../ai-visibility';
 import { aiQuestionsPath, readJson, writeJson } from '../store';
-import { askGeminiGrounded, bareDomain, brandTerms, geminiModel } from './aiVisibility';
+import { askGeminiGrounded, bareDomain, brandTerms, engineKey, geminiModel } from './aiVisibility';
 
 /**
  * Buyer questions, generated from the business itself.
@@ -72,7 +72,7 @@ export async function generateQuestions(
   domain: string,
   clientName?: string,
 ): Promise<AiQuestionSet | { error: string }> {
-  const apiKey = process.env.GEMINI_API_KEY?.trim();
+  const apiKey = engineKey('gemini');
   if (!apiKey) {
     return { error: 'Gemini is not configured. Set GEMINI_API_KEY in the server environment and restart.' };
   }

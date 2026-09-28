@@ -6,6 +6,9 @@ import { ExportReportButton } from '@/components/panels/ExportReportButton';
 import { Panel } from '@/components/panels/Panel';
 import { AiOverviewPanel } from '@/components/panels/AiOverviewPanel';
 import { OverviewHero } from '@/components/panels/OverviewHero';
+import { SearchSignalsPanels } from '@/components/panels/SearchSignalsPanels';
+import { loadQuestions } from '@/lib/providers/aiQuestions';
+import { loadSerp } from '@/lib/providers/serp';
 import { ToolLauncher } from '@/components/panels/ToolLauncher';
 import { RangeFilter } from '@/components/shell/RangeFilter';
 import { Delta, Meter, MetricCell, MiniGauge, ScoreGauge, Sparkline } from '@/components/ui/data';
@@ -68,8 +71,12 @@ export default async function OverviewPage({
    */
   const health = buildHealth(ads, backlinks, keywords);
 
-  // Last stored run only — the check itself is a button, never a render.
-  const aiRuns = await loadAiVisibility(domain);
+  // Stored results only — Gemini and the SERP Agent are never called on render.
+  const [aiRuns, questionSet, serp] = await Promise.all([
+    loadAiVisibility(domain),
+    loadQuestions(domain),
+    loadSerp(domain),
+  ]);
 
   // The roster name is what the operator calls this account; the domain alone
   // reads as configuration. Both are shown, name first.
@@ -262,6 +269,16 @@ export default async function OverviewPage({
           />
         </Panel>
       </section>
+
+      {/* ── AI search + SERP Agent ─────────────────────────────────────
+          The two newest signals, where the day starts rather than only on
+          pages you have to know to open. */}
+      <SearchSignalsPanels
+        domain={domain}
+        aiRuns={aiRuns}
+        questionSet={questionSet}
+        serp={serp}
+      />
 
       {/* ── Off-page + paid, as grouped metric panels ───────────────── */}
       <section className="grid items-start gap-4 xl:grid-cols-2">
