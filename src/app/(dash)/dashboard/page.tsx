@@ -162,6 +162,16 @@ export default async function OverviewPage({
         windowLabel={reportWindow}
       />
 
+      {/* ── AI search + SERP Agent ─────────────────────────────────────
+          Directly under the health summary: placed further down, below the
+          traffic panel, nobody scrolled far enough to find them. */}
+      <SearchSignalsPanels
+        domain={domain}
+        aiRuns={aiRuns}
+        questionSet={questionSet}
+        serp={serp}
+      />
+
       {/* ── On-page tools: each is a live action ─────────────────────── */}
       <section>
         <SectionHeading
@@ -270,15 +280,6 @@ export default async function OverviewPage({
         </Panel>
       </section>
 
-      {/* ── AI search + SERP Agent ─────────────────────────────────────
-          The two newest signals, where the day starts rather than only on
-          pages you have to know to open. */}
-      <SearchSignalsPanels
-        domain={domain}
-        aiRuns={aiRuns}
-        questionSet={questionSet}
-        serp={serp}
-      />
 
       {/* ── Off-page + paid, as grouped metric panels ───────────────── */}
       <section className="grid items-start gap-4 xl:grid-cols-2">

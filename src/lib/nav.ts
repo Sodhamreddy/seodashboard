@@ -133,7 +133,9 @@ export const NAV_ITEMS: NavItem[] = [
     tone: 'blue',
     label: 'SERP Agent',
     icon: 'target',
-    group: 'Off-page',
+    // Its own section, so it is a visible top-level link rather than a row
+    // inside the collapsed Off-page group that nobody opened.
+    group: 'SERP',
     blurb: 'Exact Google positions reported by the SERP Agent, with movement between runs.',
     // Real data, but only as live as the agent pushing it in.
     mode: 'partial',
@@ -201,6 +203,7 @@ export const GROUP_ICON: Record<string, IconName> = {
   'Off-page': 'link',
   Analytics: 'chartLine',
   'AI Search': 'sparkles',
+  SERP: 'target',
   'Paid media': 'donut',
 };
 
@@ -211,6 +214,7 @@ export const NAV_GROUPS = [
   'Off-page',
   'Analytics',
   'AI Search',
+  'SERP',
   'Paid media',
 ] as const;
 
