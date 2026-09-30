@@ -3,6 +3,7 @@ import { headers } from 'next/headers';
 import { ChartFrame, SimpleTable } from '@/components/charts/ChartShell';
 import { TrendLine } from '@/components/charts/Charts';
 import { StatTile } from '@/components/ui/data';
+import { SerpQuickCheck } from '@/components/panels/SerpQuickCheck';
 import { Badge, Card, Note, cx } from '@/components/ui/primitives';
 import { SERIES } from '@/lib/chart-palette';
 import { getActiveDomain } from '@/lib/domain';
@@ -73,6 +74,8 @@ export default async function SerpPage() {
           moment.
         </p>
       </header>
+
+      <SerpQuickCheck domain={domain} />
 
       {!latest ? (
         <Card>
