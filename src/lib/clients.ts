@@ -1,4 +1,5 @@
 import { normalizeDomain } from './env';
+import type { TrackedKeyword } from './keywords-list';
 import { CLIENTS_PATH, readJson, writeJson } from './store';
 
 /**
@@ -37,6 +38,12 @@ export type Client = {
   adsCustomerId?: string;
   /** Business Profile location id, for review automation. */
   gmbLocationId?: string;
+  /**
+   * Keywords tracked for this client, each with an optional search location.
+   * Edited in Settings as `Location | Keyword` lines; the SERP page checks
+   * this list rather than a one-off box.
+   */
+  keywords?: TrackedKeyword[];
 };
 
 
@@ -94,7 +101,12 @@ export async function removeClient(id: string) {
  */
 export async function updateClientProviders(
   id: string,
-  patch: { ga4PropertyId?: string; adsCustomerId?: string; gmbLocationId?: string },
+  patch: {
+    ga4PropertyId?: string;
+    adsCustomerId?: string;
+    gmbLocationId?: string;
+    keywords?: TrackedKeyword[];
+  },
 ): Promise<Client | { error: string }> {
   const clients = await loadClients();
   const client = clients.find((entry) => entry.id === id);
@@ -118,6 +130,10 @@ export async function updateClientProviders(
   if ('gmbLocationId' in patch) {
     const raw = clean(patch.gmbLocationId);
     client.gmbLocationId = raw ? raw.split('/').pop() : undefined;
+  }
+  if ('keywords' in patch) {
+    // An empty list clears the field, so "no keywords" has one representation.
+    client.keywords = patch.keywords && patch.keywords.length > 0 ? patch.keywords : undefined;
   }
 
   await saveClients(clients);

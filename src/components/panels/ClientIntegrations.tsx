@@ -2,11 +2,17 @@
 
 import { useEffect, useState } from 'react';
 import { Icon } from '@/components/ui/Icon';
-import { Badge, Button, Card, Input, Note, Select, cx } from '@/components/ui/primitives';
+import { Badge, Button, Card, Input, Note, Select, Textarea, cx } from '@/components/ui/primitives';
 // Type-only: importing a *value* from `@/lib/clients` would pull `store.ts`
 // and therefore `node:fs/promises` into the browser bundle. The field
 // descriptors are presentation anyway, so they belong here.
 import type { Client } from '@/lib/clients';
+import {
+  keywordsToText,
+  parseKeywordCsv,
+  parseKeywordLines,
+  MAX_TRACKED_KEYWORDS,
+} from '@/lib/keywords-list';
 
 type Ga4Option = { id: string; displayName: string; account: string };
 
@@ -96,6 +102,16 @@ export function ClientIntegrations({
    */
   const [stored, setStored] = useState(
     () => new Map(clients.map((client) => [client.id, snapshot(client)])),
+  );
+
+  /*
+   * Keyword text is held apart from the id fields: it is a multi-line block,
+   * not a single value, and the SERP page reads the parsed list rather than
+   * this text — so it round-trips through `keywordsToText` on load and is
+   * parsed back on save.
+   */
+  const [keywordText, setKeywordText] = useState(
+    () => new Map(clients.map((client) => [client.id, keywordsToText(client.keywords ?? [])])),
   );
 
   /*
@@ -258,6 +274,7 @@ export function ClientIntegrations({
           ga4PropertyId: client.ga4PropertyId ?? '',
           adsCustomerId: client.adsCustomerId ?? '',
           gmbLocationId: client.gmbLocationId ?? '',
+          keywordText: keywordText.get(client.id) ?? '',
         }),
       });
       const data = (await response.json()) as { ok?: boolean; error?: string; client?: Client };
@@ -275,6 +292,11 @@ export function ClientIntegrations({
         setStored((current) =>
           new Map(current).set(client.id, snapshot(data.client ?? client)),
         );
+        if (data.client) {
+          setKeywordText((current) =>
+            new Map(current).set(client.id, keywordsToText(data.client!.keywords ?? [])),
+          );
+        }
         setSaved(client.id);
       }
     } catch {
@@ -342,7 +364,11 @@ export function ClientIntegrations({
         const configured = CLIENT_PROVIDER_FIELDS.filter(
           (field) => (client[field.key] ?? '').toString().trim() !== '',
         ).length;
-        const dirty = snapshot(client) !== stored.get(client.id);
+        const currentKeywords = keywordText.get(client.id) ?? '';
+        const dirty =
+          snapshot(client) !== stored.get(client.id) ||
+          currentKeywords !== keywordsToText(client.keywords ?? []);
+        const parsedCount = parseKeywordLines(currentKeywords).length;
 
         return (
           <Card key={client.id}>
@@ -424,6 +450,70 @@ export function ClientIntegrations({
                   </label>
                 );
               })}
+            </div>
+
+            {/* ── Tracked keywords ─────────────────────────────────────
+                The list the SERP page checks. One per line as
+                `Location | Keyword`; a line with no pipe is a national
+                keyword. CSV upload appends rather than replaces, so a big
+                list can be built from a spreadsheet without losing edits. */}
+            <div className="mt-4 border-t border-hairline pt-3">
+              <div className="mb-1 flex items-center justify-between gap-2">
+                <span className="text-2xs font-medium text-ink-secondary">
+                  Tracked keywords{' '}
+                  <span className="text-ink-muted">
+                    ({parsedCount}
+                    {parsedCount >= MAX_TRACKED_KEYWORDS ? ` — max ${MAX_TRACKED_KEYWORDS}` : ''})
+                  </span>
+                </span>
+                <label className="inline-flex cursor-pointer items-center gap-1.5 text-2xs font-medium text-accent hover:underline">
+                  <Icon name="upload" size={12} />
+                  Upload CSV
+                  <input
+                    type="file"
+                    accept=".csv,text/csv"
+                    className="hidden"
+                    onChange={async (event) => {
+                      const file = event.target.files?.[0];
+                      event.target.value = '';
+                      if (!file) return;
+                      const text = await file.text();
+                      const uploaded = parseKeywordCsv(text);
+                      if (uploaded.length === 0) {
+                        setError('That CSV had no readable keyword rows.');
+                        return;
+                      }
+                      // Append to what's typed, then re-serialise so duplicates
+                      // across the two sources collapse.
+                      const merged = parseKeywordLines(
+                        `${keywordText.get(client.id) ?? ''}\n${keywordsToText(uploaded)}`,
+                      );
+                      setKeywordText((current) =>
+                        new Map(current).set(client.id, keywordsToText(merged)),
+                      );
+                      setSaved(null);
+                    }}
+                  />
+                </label>
+              </div>
+              <Textarea
+                value={keywordText.get(client.id) ?? ''}
+                onChange={(event) => {
+                  const next = event.target.value;
+                  setKeywordText((current) => new Map(current).set(client.id, next));
+                  setSaved(null);
+                }}
+                rows={6}
+                spellCheck={false}
+                placeholder={'Ann Arbor, MI | senior in home care\nhome care services in Detroit'}
+                className="font-mono text-2xs"
+              />
+              <p className="mt-1 text-2xs leading-relaxed text-ink-muted">
+                One per line as{' '}
+                <code className="font-mono">Location | Keyword</code> — location optional. The SERP
+                page checks these; a CSV of <code className="font-mono">location,keyword</code> rows
+                uploads too.
+              </p>
             </div>
 
             <div className="mt-3 flex items-center gap-3">

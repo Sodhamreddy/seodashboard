@@ -4,6 +4,9 @@ import { ChartFrame, SimpleTable } from '@/components/charts/ChartShell';
 import { TrendLine } from '@/components/charts/Charts';
 import { StatTile } from '@/components/ui/data';
 import { SerpQuickCheck } from '@/components/panels/SerpQuickCheck';
+import { SerpSavedCheck } from '@/components/panels/SerpSavedCheck';
+import { loadClients } from '@/lib/clients';
+import { serperConfigured } from '@/lib/free-serp';
 import { Badge, Card, Note, cx } from '@/components/ui/primitives';
 import { SERIES } from '@/lib/chart-palette';
 import { getActiveDomain } from '@/lib/domain';
@@ -27,6 +30,8 @@ export const dynamic = 'force-dynamic';
 export default async function SerpPage() {
   const domain = getActiveDomain();
   const store = await loadSerp(domain);
+  const client = (await loadClients()).find((entry) => entry.domain === domain);
+  const savedKeywords = client?.keywords ?? [];
   const snapshots = store.snapshots;
   const latest = snapshots[snapshots.length - 1];
 
@@ -74,6 +79,12 @@ export default async function SerpPage() {
           moment.
         </p>
       </header>
+
+      <SerpSavedCheck
+        domain={domain}
+        keywords={savedKeywords}
+        configured={serperConfigured()}
+      />
 
       <SerpQuickCheck domain={domain} />
 

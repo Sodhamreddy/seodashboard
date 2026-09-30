@@ -7,6 +7,7 @@ import {
   updateClientProviders,
 } from '@/lib/clients';
 import { getActiveDomain } from '@/lib/domain';
+import { parseKeywordLines } from '@/lib/keywords-list';
 import { invalidateCache } from '@/lib/providers/cache';
 
 export const runtime = 'nodejs';
@@ -35,21 +36,24 @@ export async function PATCH(request: Request) {
     ga4PropertyId?: string;
     adsCustomerId?: string;
     gmbLocationId?: string;
+    /** Raw textarea contents: `Location | Keyword` lines. */
+    keywordText?: string;
   };
   if (!body.id) return NextResponse.json({ error: 'A client id is required.' }, { status: 400 });
 
-  // A provider-id update and a rename are different edits; the presence of any
-  // id field selects the former so an empty string can still clear a field.
+  // A provider/keyword update and a rename are different edits; the presence of
+  // any such field selects the former so an empty string can still clear one.
   const idFields = ['ga4PropertyId', 'adsCustomerId', 'gmbLocationId'] as const;
-  const touchesIds = idFields.some((field) => field in body);
+  const touchesKeywords = 'keywordText' in body;
+  const touchesIds = idFields.some((field) => field in body) || touchesKeywords;
 
   const result = touchesIds
-    ? await updateClientProviders(
-        body.id,
-        Object.fromEntries(
+    ? await updateClientProviders(body.id, {
+        ...Object.fromEntries(
           idFields.filter((field) => field in body).map((field) => [field, body[field]]),
         ),
-      )
+        ...(touchesKeywords ? { keywords: parseKeywordLines(String(body.keywordText ?? '')) } : {}),
+      })
     : await renameClient(body.id, String(body.name ?? ''));
 
   if ('error' in result) {
